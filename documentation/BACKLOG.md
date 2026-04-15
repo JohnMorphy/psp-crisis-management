@@ -60,21 +60,17 @@ z `DATA_SCHEMA.md` §1. Napisz pliki seed dla wszystkich 5 tabel danych.
 ```bash
 docker compose up -d postgres
 sleep 10
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT COUNT(*) FROM placowka;"
+docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM placowka;"
 # oczekiwane: 48
 
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT COUNT(*) FROM layer_config;"
+docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM layer_config;"
 # oczekiwane: 7
 
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT COUNT(*) FROM strefy_zagrozen;"
+docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM strefy_zagrozen;"
 # oczekiwane: 3 (seed demo)
 
 # Sprawdź PostGIS
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT ST_AsText(geom) FROM placowka LIMIT 1;"
+docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT ST_AsText(geom) FROM placowka LIMIT 1;"
 # oczekiwane: POINT(...)
 ```
 
