@@ -570,40 +570,214 @@ Zatwierdzenie lub odrzucenie rekomendacji przez operatora.
 
 ## WebSocket — live feed
 
-**URL:** `ws://localhost:8080/ws` (dev) / `wss://domena/ws` (prod)
+### Do czego służy WebSocket w tej aplikacji
 
-| Topik | Kiedy | Payload |
+Aplikacja działa event-driven — gdy operator aktywuje scenariusz zagrożenia, backend
+uruchamia asynchroniczny łańcuch: import stref → obliczenie IKE → generowanie rekomendacji.
+WebSocket (STOMP over SockJS) jest jedynym mechanizmem,
+który pozwala frontendowi dowiedzieć się, że obliczenia się zakończyły i odświeżyć mapę
+**bez poolingu i bez ręcznego odświeżenia strony przez operatora**.
+
+Konkretne zastosowania w UI:
+
+| Co się zmienia | Topik | Komponent który reaguje |
 |---|---|---|
-| `/topic/layers/{id}` | Po aktualizacji warstwy | Pełny GeoJSON warstwy |
-| `/topic/ike` | Po `IkeRecalculatedEvent` | Lista `IkeResult` |
-| `/topic/decisions` | Po wygenerowaniu rekomendacji | Lista `EvacuationDecision` |
-| `/topic/system` | Zdarzenia systemowe | Obiekt zdarzenia |
+| Nowe strefy zagrożeń pojawiają się na mapie | `/topic/layers/L-03` | `ZagrozeniaLayer.jsx` |
+| Markery DPS zmieniają kolor (IKE przeliczone) | `/topic/ike` | `DPSLayer.jsx`, `Top10Panel.jsx` |
+| Rekomendacje pojawiają się w panelu | `/topic/decisions` | `DecisionPanel.jsx` |
+| Pasek statusu w nagłówku informuje o postępie | `/topic/system` | `Header.jsx` |
 
-**Przykład payloadu `/topic/system`:**
+Frontend **nie używa WebSocket do wysyłania** — wyłącznie do odbierania. Wszystkie
+akcje operatora idą przez REST (`POST /api/threat/flood/import` itp.).
+
+---
+
+### Połączenie
+
+**URL:** `ws://localhost:8080/ws` (dev) / `wss://{domena}/ws` (prod)  
+**Protokół:** STOMP over SockJS  
+**Autentykacja:** brak w v1.x
+
+```javascript
+// services/websocketService.js
+const client = new Client({
+  webSocketFactory: () => new SockJS(`${API_BASE_URL}/ws`),
+  reconnectDelay: 5000,
+});
+```
+
+---
+
+### Topiki i payloady
+
+#### `/topic/layers/L-03` — aktualizacja stref zagrożeń
+
+Publikowany przez `LiveFeedService` po `ThreatUpdatedEvent` (gdy nowe strefy są już w bazie).
+
+Frontend po otrzymaniu tego komunikatu wykonuje `invalidateQueries(['layers', 'L-03'])`
+(React Query), co powoduje ponowne pobranie pełnego GeoJSON przez REST `GET /api/layers/L-03`.
+WebSocket niesie sygnał, nie dane — dzięki temu payload jest lekki niezależnie od
+liczby stref.
+
+```json
+{
+  "typ": "LAYER_UPDATED",
+  "layer_id": "L-03",
+  "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "timestamp": "2026-04-14T09:00:45Z",
+  "liczba_obiektow": 2,
+  "scenariusz": "Q100",
+  "obszar": "chelm"
+}
+```
+
+---
+
+#### `/topic/ike` — wyniki IKE zaktualizowane
+
+Publikowany przez `LiveFeedService` po `IkeRecalculatedEvent`.
+
+Niesie pełną listę wyników dla wszystkich placówek — frontend aktualizuje Zustand store
+bezpośrednio z payloadu (bez dodatkowego REST call), bo dane są kompletne.
+
+```json
+{
+  "typ": "IKE_RECALCULATED",
+  "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "obliczone_o": "2026-04-14T09:00:58Z",
+  "statystyki": {
+    "przetworzone": 48,
+    "czerwonych": 3,
+    "zoltych": 7,
+    "zielonych": 36,
+    "nieznanych": 2
+  },
+  "wyniki": [
+    {
+      "placowka_kod": "DPS-CHE-002",
+      "lat": 51.2108,
+      "lon": 23.3984,
+      "ike_score": 0.8900,
+      "ike_kategoria": "czerwony",
+      "cel_relokacji_kod": "REL-CHE-001",
+      "cel_relokacji_nazwa": "Hala Sportowa MOSiR Chełm",
+      "czas_przejazdu_min": 31
+    },
+    {
+      "placowka_kod": "DPS-LBL-001",
+      "lat": 51.3012,
+      "lon": 22.5891,
+      "ike_score": 0.4800,
+      "ike_kategoria": "zolty",
+      "cel_relokacji_kod": "REL-LBL-001",
+      "cel_relokacji_nazwa": "Hala Widowiskowo-Sportowa w Lublinie",
+      "czas_przejazdu_min": 18
+    },
+    {
+      "placowka_kod": "DPS-VLO-002",
+      "lat": 51.0500,
+      "lon": 23.8200,
+      "ike_score": null,
+      "ike_kategoria": "nieznany",
+      "cel_relokacji_kod": null,
+      "cel_relokacji_nazwa": null,
+      "czas_przejazdu_min": null
+    }
+  ]
+}
+```
+
+> Lista zawiera **wszystkie 48 placówek** — frontend nadpisuje cały store jedną operacją.
+> Składowe `score_*` nie są przekazywane przez WebSocket — dostępne przez `GET /api/ike/{kod}`.
+
+---
+
+#### `/topic/decisions` — nowe rekomendacje ewakuacyjne
+
+Publikowany przez `LiveFeedService` po zakończeniu pracy `DecisionAgent`
+(po odczekaniu na zapis do `evacuation_decisions` lub przez dodatkowy event
+`DecisionsGeneratedEvent` — do decyzji implementacyjnej).
+
+Niesie listę rekomendacji dla bieżącego `correlation_id`. Frontend podmienia
+zawartość `DecisionPanel` w całości.
+
+```json
+{
+  "typ": "DECISIONS_GENERATED",
+  "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "wygenerowano_o": "2026-04-14T09:01:30Z",
+  "liczba_decyzji": 10,
+  "decyzje": [
+    {
+      "id": 42,
+      "placowka_kod": "DPS-CHE-002",
+      "placowka_nazwa": "Dom Pomocy Społecznej w Sawinie",
+      "powiat": "chelm",
+      "ike_score": 0.8900,
+      "ike_kategoria": "czerwony",
+      "rekomendacja": "ewakuuj_natychmiast",
+      "cel_relokacji_kod": "REL-CHE-001",
+      "cel_relokacji_nazwa": "Hala Sportowa MOSiR Chełm",
+      "uzasadnienie": "Strefa czerwona Q100, brak transportu w 15 km, 89% niesamodzielnych",
+      "zatwierdzona": null
+    },
+    {
+      "id": 43,
+      "placowka_kod": "DPS-LBL-001",
+      "placowka_nazwa": "Dom Pomocy Społecznej im. Jana Pawła II w Niemcach",
+      "powiat": "lubelski",
+      "ike_score": 0.4800,
+      "ike_kategoria": "zolty",
+      "rekomendacja": "przygotuj_ewakuacje",
+      "cel_relokacji_kod": "REL-LBL-001",
+      "cel_relokacji_nazwa": "Hala Widowiskowo-Sportowa w Lublinie",
+      "uzasadnienie": "Strefa żółta, 2 pojazdy dostępne, drogi przejezdne",
+      "zatwierdzona": null
+    }
+  ]
+}
+```
+
+---
+
+#### `/topic/system` — zdarzenia systemowe i postęp operacji
+
+Używany przez `Header.jsx` do wyświetlania paska statusu podczas długich operacji
+(import WFS, przeliczanie IKE). Operator widzi co dzieje się "pod maską" bez
+wchodzenia w logi.
 
 ```json
 {
   "typ": "THREAT_IMPORT_COMPLETED",
   "komunikat": "Import Q100 dla powiatu chełmskiego zakończony — 2 strefy załadowane",
-  "correlation_id": "f47ac10b-...",
+  "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
   "timestamp": "2026-04-14T09:00:45Z",
-  "zrodlo_danych": "wfs"
+  "szczegoly": {
+    "zrodlo_danych": "wfs",
+    "liczba_stref": 2,
+    "scenariusz": "Q100",
+    "obszar": "chelm"
+  }
 }
 ```
 
-Typy zdarzeń systemowych:
+Pełna lista typów zdarzeń:
 
-| `typ` | Znaczenie |
-|---|---|
-| `THREAT_IMPORT_STARTED` | FloodImportAgent rozpoczął pobieranie |
-| `THREAT_IMPORT_COMPLETED` | Import zakończony, strefy zapisane |
-| `THREAT_IMPORT_FALLBACK` | WFS niedostępny, użyto danych syntetycznych |
-| `THREAT_IMPORT_FAILED` | Import nieudany (błąd krytyczny) |
-| `THREAT_CLEARED` | Strefy wyczyszczone |
-| `IKE_RECALCULATED` | IkeAgent zakończył obliczenia |
-| `DECISIONS_GENERATED` | DecisionAgent wygenerował rekomendacje |
-| `SCRAPER_COMPLETED` | Scraper zakończył działanie |
-| `SYSTEM_WARNING` | Ostrzeżenie systemowe |
+| `typ` | Publikuje | Znaczenie dla UI |
+|---|---|---|
+| `THREAT_IMPORT_STARTED` | `FloodImportAgent` | Spinner na przycisku "Aktywuj scenariusz" |
+| `THREAT_IMPORT_COMPLETED` | `LiveFeedService` | Spinner znika, mapa odświeżona |
+| `THREAT_IMPORT_FALLBACK` | `LiveFeedService` | Toast: "Użyto danych syntetycznych (WFS niedostępny)" |
+| `THREAT_IMPORT_FAILED` | `LiveFeedService` | Toast błędu, import nieudany |
+| `THREAT_CLEARED` | `LiveFeedService` | Strefy znikają z mapy, IKE zerowane |
+| `IKE_RECALCULATION_STARTED` | `IkeAgent` | Spinner na panelu Top10 |
+| `IKE_RECALCULATED` | `LiveFeedService` | Markery DPS zmieniają kolor |
+| `DECISIONS_GENERATED` | `LiveFeedService` | DecisionPanel wypełnia się rekomendacjami |
+| `SCRAPER_COMPLETED` | `LiveFeedService` | Toast: "Pobrano N rekordów" |
+| `SYSTEM_WARNING` | dowolny agent | Toast ostrzeżenia (żółty) |
+
+Struktura `szczegoly` jest opcjonalna i różni się zależnie od `typ` — frontend
+powinien traktować ją jako `Map<String, Object>` i wyświetlać tylko `komunikat`.
 
 ---
 
@@ -623,7 +797,7 @@ Typy zdarzeń systemowych:
 | `POST /api/calculate/relocation` | `RelocationCalculator.jsx` |
 | `POST /api/calculate/threat` | `ThreatSpreadCalculator.jsx` |
 | `POST /api/scraper/run` | przycisk w `LayerControlPanel.jsx` |
-| WebSocket `/topic/layers/{id}` | `useWebSocket.js` |
-| WebSocket `/topic/ike` | `useWebSocket.js` → `Top10Panel` |
-| WebSocket `/topic/decisions` | `useWebSocket.js` → `DecisionPanel` |
-| WebSocket `/topic/system` | `Header.jsx` (status systemu) |
+| WebSocket `/topic/layers/L-03` | `useWebSocket.js` → `invalidateQueries` → `ZagrozeniaLayer.jsx` |
+| WebSocket `/topic/ike` | `useWebSocket.js` → Zustand store → `DPSLayer.jsx`, `Top10Panel.jsx` |
+| WebSocket `/topic/decisions` | `useWebSocket.js` → Zustand store → `DecisionPanel.jsx` |
+| WebSocket `/topic/system` | `useWebSocket.js` → `Header.jsx` (pasek statusu + toasty) |

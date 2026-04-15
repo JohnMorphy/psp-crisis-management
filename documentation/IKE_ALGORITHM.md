@@ -353,7 +353,21 @@ Gdy IKE = null (E6/E11):
 
 ## 9. Konfiguracja wag
 
-Patrz `frontend/src/config/ike.config.json` i `docs/DATA_SCHEMA.md` sekcja 8.
+Patrz `backend/src/main/resources/ike.config.json` i `docs/DATA_SCHEMA.md` sekcja 8.
+
+Plik leży po stronie backendu i wczytywany jest przez `IkeAgent` przez `ClassPathResource`:
+
+```java
+@PostConstruct
+void loadConfig() {
+    ClassPathResource res = new ClassPathResource("ike.config.json");
+    IkeConfig config = objectMapper.readValue(res.getInputStream(), IkeConfig.class);
+    this.wagi = config.getWagi();
+    // walidacja sumy wag ...
+}
+```
+
+Frontend pobiera aktualną konfigurację wyłącznie przez `GET /api/ike/config` — nie czyta pliku bezpośrednio.
 
 Zmiana wag → restart backendu lub `POST /api/ike/recalculate`
 (publikuje `ThreatUpdatedEvent` z bieżącymi strefami).
@@ -475,7 +489,8 @@ FUNKCJA recalculateAll(correlationId):
       k. Pobierz trasę z OSRM
          → OSRM offline: trasa = null, nie blokuj wyniku IKE
 
-      l. Upsert do ike_results z correlation_id
+      l. Upsert do ike_results z correlation_id — zapisz wszystkie pięć kolumn
+         score_* (mogą być NULL jeśli obliczenie nie było możliwe) oraz data_warnings
 
   3. Po przetworzeniu wszystkich placówek:
      publisher.publishEvent(new IkeRecalculatedEvent(correlationId))

@@ -192,6 +192,39 @@ public class ThreatUpdatedEvent extends ApplicationEvent {
 }
 ```
 
+### 4.1a `IkeRecalculatedEvent`
+
+Publikowany przez `IkeAgent` po zakończeniu przeliczania IKE dla wszystkich placówek.
+Niesie gotowe wyniki — `DecisionAgent` i `LiveFeedService` mogą z nich skorzystać
+bez ponownego odpytywania bazy.
+
+```java
+// backend/src/main/java/pl/lublin/dashboard/event/IkeRecalculatedEvent.java
+public class IkeRecalculatedEvent extends ApplicationEvent {
+    private final String correlationId;     // UUID z ThreatUpdatedEvent który wywołał obliczenie
+    private final Instant obliczoneO;       // kiedy zakończono obliczenia
+    private final int liczbaPrzetworzonych; // ile placówek przetworzono (łącznie — wliczając pominięte)
+    private final int liczbaZWynikiem;      // ile placówek ma ike_score != null
+    private final int liczbaNull;           // ile placówek dostało ike_score = null (E6/E11)
+    private final List<IkeResultSummary> wyniki; // gotowe wyniki — żeby listenery nie musiały odpytywać bazy
+}
+```
+
+Typ pomocniczy `IkeResultSummary` — lekki widok wyniku (nie pełne DTO):
+
+```java
+public record IkeResultSummary(
+    String placowkaKod,
+    Double ikeScore,       // null gdy wykluczona (E6/E11)
+    String ikeKategoria,   // "czerwony" | "zolty" | "zielony" | "nieznany"
+    String celRelokacjiKod // null gdy brak miejsca relokacji
+) {}
+```
+
+**Zasada:** `DecisionAgent` i `LiveFeedService` słuchają wyłącznie `IkeRecalculatedEvent`,
+nie `ThreatUpdatedEvent`. Dzięki temu mają gwarancję, że IKE jest już obliczone zanim
+zaczną działać, i mogą użyć pola `wyniki` zamiast odpytywać bazę.
+
 ### 4.2 `FloodImportAgent`
 
 ```
@@ -244,33 +277,46 @@ Uwaga: @Async — działa w osobnym wątku, nie blokuje wątku HTTP.
 ```
 Odpowiedzialność: generowanie rekomendacji ewakuacyjnych na podstawie IKE
 
-Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @Async
+Wyzwalacz: @EventListener(IkeRecalculatedEvent) + @Async
+           ↑ Słucha IkeRecalculatedEvent, nie ThreatUpdatedEvent — gwarancja
+             że IKE jest już obliczone. Wyniki dostępne w event.getWyniki().
 
 Algorytm:
-1. Pobierz wyniki IKE z tabeli ike_results (mogą być jeszcze nieprzeliczone —
-   odczekaj na IkeRecalculatedEvent lub odpytuj z retry)
+1. Pobierz wyniki IKE z event.getWyniki() (bez dodatkowego zapytania do bazy)
 2. Dla placówek z IKE >= 0.70: rekomendacja = 'ewakuuj_natychmiast'
 3. Dla IKE 0.40-0.69: rekomendacja = 'przygotuj_ewakuacje'
 4. Dla IKE < 0.40: rekomendacja = 'monitoruj'
-5. Zapisz do tabeli evacuation_decisions
+5. Dla IKE = null (ike_kategoria = 'nieznany'): pomijaj — brak rekomendacji
+6. Uzasadnienie: wygeneruj na podstawie składowych score_* z tabeli ike_results
+   (pobierz tylko dla placówek z rekomendacją 'ewakuuj_natychmiast' i 'przygotuj')
+7. Zapisz do tabeli evacuation_decisions z tym samym correlation_id
 ```
 
-**Uwaga implementacyjna:** `DecisionAgent` i `IkeAgent` oboje słuchają
-`ThreatUpdatedEvent` i działają asynchronicznie. `DecisionAgent` potrzebuje
-świeżych wyników IKE — może słuchać `IkeRecalculatedEvent` zamiast
-`ThreatUpdatedEvent`, żeby mieć gwarancję że IKE jest już przeliczone.
+**Wzorzec event-driven między agentami:**
+`IkeAgent` → publikuje `IkeRecalculatedEvent` → `DecisionAgent` + `LiveFeedService` słuchają.
+Dzięki temu `DecisionAgent` zawsze ma gwarancję świeżych danych IKE i może użyć
+`event.getWyniki()` zamiast ponownie odpytywać bazę.
 
 ### 4.5 `LiveFeedService`
 
 ```
-Odpowiedzialność: push aktualizacji przez WebSocket do frontendu
+Odpowiedzialność: push aktualizacji przez WebSocket do wszystkich podłączonych klientów
 
-Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @EventListener(IkeRecalculatedEvent)
+Wyzwalacze:
+  @EventListener(ThreatUpdatedEvent)   + @Async  →  push stref zagrożeń
+  @EventListener(IkeRecalculatedEvent) + @Async  →  push wyników IKE + rekomendacji
 
-Działanie:
-- Po ThreatUpdatedEvent: push do /topic/layers/L-03 (nowe strefy zagrożeń)
-- Po IkeRecalculatedEvent: push do /topic/ike (nowe wyniki IKE)
-- Payload: pełny GeoJSON warstwy lub lista IkeResult DTO
+Działanie po ThreatUpdatedEvent:
+  - Pobierz świeże strefy z bazy (SELECT * FROM strefy_zagrozen WHERE correlation_id = ?)
+  - Push do /topic/layers/L-03 — pełny GeoJSON zaktualizowanych stref
+  - Push do /topic/system — typ: THREAT_IMPORT_COMPLETED (lub THREAT_CLEARED)
+
+Działanie po IkeRecalculatedEvent:
+  - Użyj event.getWyniki() — bez dodatkowego zapytania do bazy
+  - Push do /topic/ike — lista IkeResultSummary wzbogacona o pola potrzebne frontendowi
+  - Pobierz rekomendacje z bazy (SELECT * FROM evacuation_decisions WHERE correlation_id = ?)
+  - Push do /topic/decisions — lista EvacuationDecision DTO
+  - Push do /topic/system — typ: IKE_RECALCULATED, DECISIONS_GENERATED
 ```
 
 ---

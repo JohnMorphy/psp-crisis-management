@@ -191,15 +191,26 @@ CREATE TABLE IF NOT EXISTS ike_results (
     ike_kategoria            VARCHAR(10)   CHECK (ike_kategoria IN (
                                'czerwony', 'zolty', 'zielony', 'nieznany'
                              )),
+    -- ── Składowe score'ów (każda [0.0–1.0], NULL = nie można było obliczyć) ──
+    score_zagrozenia         DECIMAL(5,4)  CHECK (score_zagrozenia         BETWEEN 0 AND 1),
+    score_niesamodzielnych   DECIMAL(5,4)  CHECK (score_niesamodzielnych   BETWEEN 0 AND 1),
+    score_braku_transportu   DECIMAL(5,4)  CHECK (score_braku_transportu   BETWEEN 0 AND 1),
+    score_braku_droznosci    DECIMAL(5,4)  CHECK (score_braku_droznosci    BETWEEN 0 AND 1),
+    score_odleglosci_relokacji DECIMAL(5,4) CHECK (score_odleglosci_relokacji BETWEEN 0 AND 1),
+    -- ── Ostrzeżenia z edge case'ów (lista kodów, np. ["niesamodzielni_procent_brak"]) ──
+    data_warnings            JSONB         DEFAULT '[]'::jsonb,
+    -- ── Cel relokacji i trasa ──
     cel_relokacji_kod        VARCHAR(20)   REFERENCES miejsca_relokacji(kod),
     trasa_relokacji_geom     GEOMETRY(LineString, 4326),
     czas_przejazdu_min       INTEGER       CHECK (czas_przejazdu_min >= 0),
-    correlation_id           VARCHAR(36),   -- UUID z ThreatUpdatedEvent który wywołał obliczenie
+    correlation_id           VARCHAR(36),  -- UUID z ThreatUpdatedEvent który wywołał obliczenie
     obliczone_o              TIMESTAMPTZ   DEFAULT NOW(),
     PRIMARY KEY (placowka_kod)
 );
-CREATE INDEX IF NOT EXISTS idx_ike_score       ON ike_results(ike_score DESC NULLS LAST);
-CREATE INDEX IF NOT EXISTS idx_ike_correlation ON ike_results(correlation_id);
+CREATE INDEX IF NOT EXISTS idx_ike_score           ON ike_results(ike_score DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_ike_correlation     ON ike_results(correlation_id);
+CREATE INDEX IF NOT EXISTS idx_ike_zagrozenie      ON ike_results(score_zagrozenia DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_ike_kategoria       ON ike_results(ike_kategoria);
 
 -- ============================================================
 -- TABELA: evacuation_decisions
@@ -725,9 +736,12 @@ EOF
 
 ## 8. Konfiguracja IKE — `ike.config.json`
 
-**Lokalizacja:** `frontend/src/config/ike.config.json`
-**Wczytywany przez:** `IkeAgent.java` (`@PostConstruct`)
-**API:** `GET /api/ike/config`
+**Lokalizacja:** `backend/src/main/resources/ike.config.json`
+**Wczytywany przez:** `IkeAgent.java` (`@PostConstruct`) przez `ClassPathResource`
+**API:** `GET /api/ike/config` — frontend pobiera konfigurację przez ten endpoint, nie czyta pliku bezpośrednio
+
+> Plik leży po stronie backendu, bo wczytuje go wyłącznie `IkeAgent.java`.
+> Frontend nigdy nie sięga do systemu plików — wagi i progi pobiera przez `GET /api/ike/config`.
 
 ```json
 {
