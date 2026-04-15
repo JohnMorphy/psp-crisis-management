@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Następne:** `1.1 — docker-compose.yml + baza danych`
+**Aktywne:** `1.2 — Setup Spring Boot`
 
 ---
 
@@ -78,7 +78,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT ST_AsTex
 
 ---
 
-### ⬜ 1.2 — Setup Spring Boot
+### 🔄 1.2 — Setup Spring Boot
 
 **Pliki do stworzenia:**
 - `backend/pom.xml`

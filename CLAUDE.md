@@ -54,21 +54,33 @@ eliminując race condition.
 ## Struktura repozytorium
 
 ```
-gis-dashboard/                  # katalog główny repo (jeden Git)
+psp-crisis-management/          # katalog główny repo (jeden Git)
 ├── CLAUDE.md
 ├── docker-compose.yml          # tryb dev: tylko PostgreSQL + PostGIS
 ├── docker-compose.full.yml     # tryb full-stack: postgres + backend + frontend
 ├── .env.example
 ├── .gitignore
-├── frontend/                   # aplikacja React (Vite)
+├── frontend/                   # aplikacja React (Vite) — zadanie 1.3
 │   ├── package.json
 │   └── src/
 ├── backend/                    # aplikacja Spring Boot (Maven)
-│   ├── pom.xml
+│   ├── pom.xml                 # groupId: qqq, artifactId: gis-map
+│   ├── Dockerfile
 │   └── src/
-└── documentation/                       # dokumentacja projektu
+│       └── main/
+│           ├── java/pl/lublin/dashboard/   # package root
+│           │   ├── DashboardApplication.java
+│           │   └── config/
+│           │       ├── CorsConfig.java
+│           │       └── DataSourceConfig.java
+│           └── resources/
+│               ├── application.yml
+│               ├── application-dev.yml
+│               └── db/                     # SQL init (docker-entrypoint-initdb.d)
+└── documentation/
     ├── PRD.md
     ├── ARCHITEKTURA_PLAN.md
+    ├── BACKLOG.md
     ├── DATA_SCHEMA.md
     ├── IKE_ALGORITHM.md
     ├── API_REFERENCE.md

@@ -1,5 +1,6 @@
-# Tryb dev — tylko baza danych.
-# Backend i frontend uruchamiane lokalnie (./mvnw spring-boot:run, npm run dev).
+# Tryb full-stack — postgres + backend (+ frontend w zadaniu 4.2).
+# Służy do demo, onboardingu i deploymentu na VPS.
+# Nie wymaga lokalnej instalacji Javy ani Node.js.
 # Szczegóły: documentation/DEPLOYMENT.md
 
 services:
@@ -25,6 +26,28 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    container_name: gis_backend
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:
