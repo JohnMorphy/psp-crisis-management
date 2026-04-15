@@ -156,9 +156,14 @@ volumes:
 │  │                                                      │     │
 │  │  FloodImportAgent ──publishes──► ThreatUpdatedEvent  │     │
 │  │                                         │            │     │
-│  │  IkeAgent ◄── @EventListener ───────────┤            │     │
-│  │  DecisionAgent ◄── @EventListener ──────┤            │     │
-│  │  LiveFeedService ◄── @EventListener ────┘            │     │
+│  │  IkeAgent ◄── @EventListener ───────────┘            │     │
+│  │      │                                               │     │
+│  │      └──publishes──► IkeRecalculatedEvent            │     │
+│  │                              │                       │     │
+│  │  DecisionAgent ◄─────────────┤  @EventListener      │     │
+│  │  LiveFeedService ◄───────────┘  @EventListener      │     │
+│  │  (LiveFeedService słucha też ThreatUpdatedEvent      │     │
+│  │   dla push stref po imporcie)                        │     │
 │  └─────────────────────────────────────────────────────┘     │
 │                                                               │
 │  Services                                                     │
@@ -308,7 +313,8 @@ Wyzwalacze:
 
 Działanie po ThreatUpdatedEvent:
   - Pobierz świeże strefy z bazy (SELECT * FROM strefy_zagrozen WHERE correlation_id = ?)
-  - Push do /topic/layers/L-03 — pełny GeoJSON zaktualizowanych stref
+  - Push do /topic/layers/L-03 — sygnał LAYER_UPDATED (nie pełny GeoJSON; frontend
+    wykonuje invalidateQueries i pobiera dane przez GET /api/layers/L-03)
   - Push do /topic/system — typ: THREAT_IMPORT_COMPLETED (lub THREAT_CLEARED)
 
 Działanie po IkeRecalculatedEvent:
@@ -632,7 +638,7 @@ ALTER TABLE strefy_zagrozen
 | 2.6 | `FloodImportAgent.java` (stub) | Przyjmuje request, generuje syntetyczne strefy, publikuje event |
 | 2.7 | `ThreatController.java` | `POST /api/threat/flood/import`, `POST /api/threat/clear` |
 | 2.8 | `WebSocketConfig.java` | STOMP + SockJS |
-| 2.9 | `LiveFeedService.java` | `@EventListener` → push przez WebSocket |
+| 2.9 | `LiveFeedService.java` | `@EventListener(ThreatUpdatedEvent)` → push stref; `@EventListener(IkeRecalculatedEvent)` → push IKE + rekomendacji |
 | 2.10 | `DecisionController.java` | `GET /api/decisions` |
 | 2.11 | `services/websocketService.js` + `hooks/useWebSocket.js` | WebSocket client React |
 | 2.12 | `components/panels/ScenarioPanel.jsx` | UI wyboru scenariusza |

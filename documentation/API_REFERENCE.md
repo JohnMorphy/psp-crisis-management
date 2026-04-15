@@ -117,8 +117,15 @@ Aktualizacja mapy następuje przez WebSocket (`/topic/layers/L-03`, `/topic/ike`
 
 ### `POST /api/threat/clear`
 
-Czyści wszystkie aktywne strefy zagrożeń z tabeli `strefy_zagrozen`
-i publikuje `ThreatUpdatedEvent` z pustą listą stref (IKE = 0 dla wszystkich placówek).
+Usuwa wszystkie rekordy z tabeli `strefy_zagrozen` i publikuje `ThreatUpdatedEvent`
+z pustą listą stref. `IkeAgent` przelicza IKE od nowa — z `score_zagrozenia = 0.0`
+dla wszystkich placówek (brak stref = brak zagrożenia), ale pozostałe składowe
+(transport, drożność, odległość, niesamodzielni) są liczone normalnie.
+Wyniki IKE po ThreatClear będą niskie, lecz niekoniecznie zerowe.
+
+> **Uwaga:** ThreatClear **nie zeruje IKE** — uruchamia pełne przeliczenie
+> algorytmu w warunkach braku zagrożenia. Przykład: placówka z `niesamodzielni_procent = 0.20`
+> i odległością relokacji 12 km uzyska IKE ≈ 0.06, nie 0.0.
 
 **Body:** brak
 
@@ -574,7 +581,7 @@ Zatwierdzenie lub odrzucenie rekomendacji przez operatora.
 
 Aplikacja działa event-driven — gdy operator aktywuje scenariusz zagrożenia, backend
 uruchamia asynchroniczny łańcuch: import stref → obliczenie IKE → generowanie rekomendacji.
-WebSocket (STOMP over SockJS) jest jedynym mechanizmem,
+Cały łańcuch trwa do 30 sekund. WebSocket (STOMP over SockJS) jest jedynym mechanizmem,
 który pozwala frontendowi dowiedzieć się, że obliczenia się zakończyły i odświeżyć mapę
 **bez poolingu i bez ręcznego odświeżenia strony przez operatora**.
 

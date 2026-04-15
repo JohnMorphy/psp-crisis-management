@@ -144,7 +144,7 @@ jest ustawione w `application-dev.yml`. Jeśli nie — wykonaj ręcznie:
 grep "sql.init.mode" backend/src/main/resources/application-dev.yml
 
 # Jeśli nie (manual seed):
-for f in schema seed_layers seed_dps seed_relokacja seed_transport seed_strefy seed_social; do
+for f in schema seed_layers seed_dps seed_relokacja seed_transport seed_strefy; do
   docker compose exec postgres psql -U ${POSTGRES_USER:-lublin} -d ${POSTGRES_DB:-gis_dashboard} \
     -f /docker-entrypoint-initdb.d/${f}.sql
 done
@@ -480,9 +480,6 @@ CORS_ALLOWED_ORIGINS=http://localhost:5173
 
 # WebSocket
 WEBSOCKET_ALLOWED_ORIGINS=http://localhost:5173
-
-# IKE — interwał automatycznego przeliczania [sekundy]
-IKE_RECALCULATE_INTERVAL_S=300      # co 5 minut
 
 # Scraper — interwał automatyczny [sekundy]
 SCRAPER_INTERVAL_S=86400            # co 24 godziny

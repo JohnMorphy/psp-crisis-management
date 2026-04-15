@@ -99,18 +99,21 @@ FloodImportAgent:
     4. publishEvent(new ThreatUpdatedEvent(scenariusz, obszar, timestamp))
     ↓ [HTTP odpowiada 202 Accepted — poniższe dzieje się asynchronicznie]
     ↓
-    ├── IkeAgent (@Async @EventListener)
+    ├── IkeAgent (@Async @EventListener ThreatUpdatedEvent)
     │       przelicza IKE dla wszystkich placówek
     │       zapisuje wyniki do ike_results
-    │       publishEvent(IkeRecalculatedEvent)
+    │       publishEvent(IkeRecalculatedEvent)   ← sekwencja gwarantowana
+    │            │
+    │            ├── DecisionAgent (@Async @EventListener IkeRecalculatedEvent)
+    │            │       generuje rekomendacje ewakuacyjne na podstawie gotowych wyników IKE
+    │            │       zapisuje do tabeli evacuation_decisions
+    │            │
+    │            └── LiveFeedService (@Async @EventListener IkeRecalculatedEvent)
+    │                    pushuje /topic/ike, /topic/decisions przez WebSocket
+    │                    frontend automatycznie odświeża mapę i panele
     │
-    ├── DecisionAgent (@Async @EventListener)
-    │       na podstawie IKE generuje rekomendacje ewakuacyjne
-    │       zapisuje do tabeli evacuation_decisions
-    │
-    └── LiveFeedService (@Async @EventListener)
-            pushuje przez WebSocket do wszystkich podłączonych klientów
-            frontend automatycznie odświeża mapę i panele
+    └── LiveFeedService (@Async @EventListener ThreatUpdatedEvent)
+            pushuje /topic/layers/L-03 (nowe strefy) i /topic/system (postęp)
 ```
 
 ### 4.2 Scenariusze zagrożeń
@@ -128,6 +131,11 @@ Użytkownik nie rysuje stref ręcznie. Wybiera gotowy scenariusz z listy:
 IKE przelicza się **wyłącznie** w reakcji na `ThreatUpdatedEvent`. Nie ma przycisku
 „Przelicz IKE" dostępnego wprost — endpoint `POST /api/ike/recalculate` istnieje
 wyłącznie na potrzeby administratora i wewnętrznie publikuje `ThreatUpdatedEvent`.
+
+`DecisionAgent` i `LiveFeedService` (push IKE + rekomendacji) reagują na
+`IkeRecalculatedEvent` — event publikowany przez `IkeAgent` po zakończeniu
+obliczeń. Gwarantuje to, że rekomendacje nigdy nie są generowane na podstawie
+częściowych wyników IKE.
 
 ---
 
@@ -186,7 +194,7 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 
 #### F-07 — Panel rekomendacji (DecisionPanel)
 
-- Lista rekomendacji wygenerowanych przez DecisionAgent po ostatnim `ThreatUpdatedEvent`
+- Lista rekomendacji wygenerowanych przez DecisionAgent po ostatnim `IkeRecalculatedEvent`
 - Każda rekomendacja: placówka, akcja (ewakuuj / przygotuj / monitoruj),
   priorytet, sugerowany cel relokacji
 - Możliwość zatwierdzenia / odrzucenia rekomendacji przez operatora

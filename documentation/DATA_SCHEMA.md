@@ -4,6 +4,27 @@
 > PostgreSQL jest jedynym źródłem danych runtime.
 > Pliki seed służą wyłącznie do inicjalizacji bazy.
 
+### Konwencja identyfikatorów administracyjnych
+
+Pole `powiat` (i `gmina`) we **wszystkich tabelach operacyjnych** używa slugów:
+małe litery ASCII, bez polskich znaków, bez spacji, bez prefiksów.
+
+| Forma w bazie (slug) | Forma prezentacyjna (tylko UI) |
+|---|---|
+| `lubelski` | Powiat lubelski |
+| `chelm` | Powiat chełmski |
+| `lublin` | Miasto Lublin |
+| `zamosc` | Miasto Zamość |
+| `biala_podlaska` | Miasto Biała Podlaska |
+| `chelmski` | Powiat chełmski (obszar wiejski) |
+
+Reguła zamiany: `toLowerCase()` → usuń polskie znaki → zamień spacje i myślniki
+na `_` → usuń prefiks `m.` / `miasto` / `powiat`.
+
+Pola `nazwa` i `adres` przechowują formy prezentacyjne — są wyłącznie do wyświetlania.
+API przyjmuje slugi w parametrach filtrów (`?powiat=chelm`). Joiny i WHERE zawsze
+operują na slugach. **Nie używaj form `M. Lublin`, `M. Chełm` w kolumnach `powiat`.**
+
 ---
 
 ## Spis treści
@@ -462,45 +483,45 @@ VALUES
 
 -- MIASTO ZAMOŚĆ (prawa powiatu)
 ('DPS-ZAM-M-001', 'Dom Pomocy Społecznej Caritas w Zamościu',
- 'DPS_dorosli', 'M. Zamość', 'Zamość', 'ul. Okrzei 5, 22-400 Zamość',
+ 'DPS_dorosli', 'zamosc', 'Zamość', 'ul. Okrzei 5, 22-400 Zamość',
  ST_SetSRID(ST_MakePoint(23.2520, 50.7162), 4326),
  130, 117, 0.79, TRUE, 15, '84-638-60-90', 'syntetyczne'),
 
 ('DPS-ZAM-M-002', 'Centrum Opieki Senioralnej w Zamościu',
- 'centrum_opiekuncze', 'M. Zamość', 'Zamość', 'ul. Wyszyńskiego 9, 22-400 Zamość',
+ 'centrum_opiekuncze', 'zamosc', 'Zamość', 'ul. Wyszyńskiego 9, 22-400 Zamość',
  ST_SetSRID(ST_MakePoint(23.2610, 50.7280), 4326),
  60, 55, 0.62, FALSE, 7, '84-639-44-11', 'syntetyczne'),
 
 -- MIASTO LUBLIN (prawa powiatu)
 ('DPS-LBL-M-001', 'Dom Pomocy Społecznej przy ul. Głębokiej w Lublinie',
- 'DPS_dorosli', 'M. Lublin', 'Lublin', 'ul. Głęboka 11, 20-612 Lublin',
+ 'DPS_dorosli', 'lublin', 'Lublin', 'ul. Głęboka 11, 20-612 Lublin',
  ST_SetSRID(ST_MakePoint(22.5231, 51.2465), 4326),
  150, 138, 0.84, TRUE, 18, '81-466-51-00', 'syntetyczne'),
 
 ('DPS-LBL-M-002', 'Dom Pomocy Społecznej przy ul. Sławinkowskiej w Lublinie',
- 'DPS_dorosli', 'M. Lublin', 'Lublin', 'ul. Sławinkowska 37, 20-810 Lublin',
+ 'DPS_dorosli', 'lublin', 'Lublin', 'ul. Sławinkowska 37, 20-810 Lublin',
  ST_SetSRID(ST_MakePoint(22.5080, 51.2860), 4326),
  120, 109, 0.76, TRUE, 14, '81-744-17-22', 'syntetyczne'),
 
 -- MIASTO CHEŁM (prawa powiatu)
 ('DPS-CHE-M-001', 'Dom Pomocy Społecznej przy ul. Ceramicznej w Chełmie',
- 'DPS_dorosli', 'M. Chełm', 'Chełm', 'ul. Ceramiczna 1, 22-100 Chełm',
+ 'DPS_dorosli', 'chelm', 'Chełm', 'ul. Ceramiczna 1, 22-100 Chełm',
  ST_SetSRID(ST_MakePoint(23.4580, 51.1320), 4326),
  100, 92, 0.77, TRUE, 11, '82-562-78-30', 'syntetyczne'),
 
 ('DPS-CHE-M-002', 'Centrum Opiekuńczo-Mieszkalne w Chełmie',
- 'centrum_opiekuncze', 'M. Chełm', 'Chełm', 'ul. Połaniecka 4, 22-100 Chełm',
+ 'centrum_opiekuncze', 'chelm', 'Chełm', 'ul. Połaniecka 4, 22-100 Chełm',
  ST_SetSRID(ST_MakePoint(23.4810, 51.1488), 4326),
  40, 36, 0.50, FALSE, 4, '82-563-10-55', 'syntetyczne'),
 
 -- MIASTO BIAŁA PODLASKA (prawa powiatu)
 ('DPS-BIA-M-001', 'Dom Pomocy Społecznej przy ul. Terebelskiej w Białej Podlaskiej',
- 'DPS_dorosli', 'M. Biała Podlaska', 'Biała Podlaska', 'ul. Terebelska 57, 21-500 Biała Podlaska',
+ 'DPS_dorosli', 'biala_podlaska', 'Biała Podlaska', 'ul. Terebelska 57, 21-500 Biała Podlaska',
  ST_SetSRID(ST_MakePoint(23.1290, 52.0410), 4326),
  90, 83, 0.71, TRUE, 10, '83-343-30-30', 'syntetyczne'),
 
 ('DPS-BIA-M-002', 'Centrum Opieki w Białej Podlaskiej',
- 'centrum_opiekuncze', 'M. Biała Podlaska', 'Biała Podlaska', 'ul. Młodości 12, 21-500 Biała Podlaska',
+ 'centrum_opiekuncze', 'biala_podlaska', 'Biała Podlaska', 'ul. Młodości 12, 21-500 Biała Podlaska',
  ST_SetSRID(ST_MakePoint(23.1350, 52.0370), 4326),
  45, 40, 0.58, FALSE, 5, '83-343-40-40', 'syntetyczne');
 ```
@@ -518,22 +539,22 @@ INSERT INTO miejsca_relokacji
      pojemnosc_ogolna, pojemnosc_dostepna, przyjmuje_niesamodzielnych, kontakt, zrodlo)
 VALUES
 ('REL-LBL-001', 'Hala Sportowa MOSiR Lublin',
- 'hala_sportowa', 'M. Lublin', 'Lublin', 'ul. Filaretów 44, 20-609 Lublin',
+ 'hala_sportowa', 'lublin', 'Lublin', 'ul. Filaretów 44, 20-609 Lublin',
  ST_SetSRID(ST_MakePoint(22.5372, 51.2401), 4326),
  350, 350, TRUE, '81-466-25-00', 'syntetyczne'),
 
 ('REL-ZAM-001', 'Hala Widowiskowo-Sportowa w Zamościu',
- 'hala_sportowa', 'M. Zamość', 'Zamość', 'ul. Królowej Jadwigi 8, 22-400 Zamość',
+ 'hala_sportowa', 'zamosc', 'Zamość', 'ul. Królowej Jadwigi 8, 22-400 Zamość',
  ST_SetSRID(ST_MakePoint(23.2480, 50.7190), 4326),
  400, 400, TRUE, '84-639-30-80', 'syntetyczne'),
 
 ('REL-CHE-001', 'Hala Sportowa MOSiR Chełm',
- 'hala_sportowa', 'M. Chełm', 'Chełm', 'ul. Sienkiewicza 27, 22-100 Chełm',
+ 'hala_sportowa', 'chelm', 'Chełm', 'ul. Sienkiewicza 27, 22-100 Chełm',
  ST_SetSRID(ST_MakePoint(23.4690, 51.1380), 4326),
  300, 300, TRUE, '82-565-35-00', 'syntetyczne'),
 
 ('REL-BIA-001', 'Hala Sportowa w Białej Podlaskiej',
- 'hala_sportowa', 'M. Biała Podlaska', 'Biała Podlaska', 'ul. Kolejowa 14, 21-500 Biała Podlaska',
+ 'hala_sportowa', 'biala_podlaska', 'Biała Podlaska', 'ul. Kolejowa 14, 21-500 Biała Podlaska',
  ST_SetSRID(ST_MakePoint(23.1220, 52.0290), 4326),
  250, 250, TRUE, '83-342-81-30', 'syntetyczne'),
 
@@ -568,11 +589,11 @@ INSERT INTO zasob_transportu
      pojemnosc_osob, przyjmuje_niesamodzielnych, dostepny, zrodlo)
 VALUES
 ('TRP-001', 'bus_sanitarny', 'Bus San. LUB-1', 'Pogotowie Ratunkowe Lublin',
- 'M. Lublin', ST_SetSRID(ST_MakePoint(22.5684, 51.2502), 4326),
+ 'lublin', ST_SetSRID(ST_MakePoint(22.5684, 51.2502), 4326),
  8, TRUE, TRUE, 'syntetyczne'),
 
 ('TRP-002', 'bus_sanitarny', 'Bus San. LUB-2', 'Pogotowie Ratunkowe Lublin',
- 'M. Lublin', ST_SetSRID(ST_MakePoint(22.5410, 51.2610), 4326),
+ 'lublin', ST_SetSRID(ST_MakePoint(22.5410, 51.2610), 4326),
  8, TRUE, TRUE, 'syntetyczne'),
 
 ('TRP-003', 'bus_zwykly', 'Bus PKS LUB-5', 'PKS Lublin',
@@ -580,11 +601,11 @@ VALUES
  45, FALSE, TRUE, 'syntetyczne'),
 
 ('TRP-004', 'karetka', 'Karetka LUB-K1', 'SPZOZ Lublin',
- 'M. Lublin', ST_SetSRID(ST_MakePoint(22.5750, 51.2480), 4326),
+ 'lublin', ST_SetSRID(ST_MakePoint(22.5750, 51.2480), 4326),
  2, TRUE, TRUE, 'syntetyczne'),
 
 ('TRP-005', 'bus_sanitarny', 'Bus San. CHE-1', 'Pogotowie Ratunkowe Chełm',
- 'M. Chełm', ST_SetSRID(ST_MakePoint(23.4700, 51.1400), 4326),
+ 'zamosc', ST_SetSRID(ST_MakePoint(23.4700, 51.1400), 4326),
  8, TRUE, TRUE, 'syntetyczne'),
 
 ('TRP-006', 'bus_sanitarny', 'Bus San. CHE-2', 'Pogotowie Ratunkowe Chełm',
@@ -596,7 +617,7 @@ VALUES
  45, FALSE, TRUE, 'syntetyczne'),
 
 ('TRP-008', 'pojazd_specjalny', 'Pojazd Spec. STR-1', 'Straż Pożarna Lublin',
- 'M. Lublin', ST_SetSRID(ST_MakePoint(22.5600, 51.2550), 4326),
+ 'lublin', ST_SetSRID(ST_MakePoint(22.5600, 51.2550), 4326),
  12, TRUE, TRUE, 'syntetyczne'),
 
 ('TRP-009', 'bus_sanitarny', 'Bus San. BIA-1', 'Pogotowie Biała Podlaska',
@@ -693,6 +714,12 @@ VALUES
 
 **Lokalizacja:** `backend/src/main/resources/geojson/`
 **Serwowane przez:** `GeoService.java` → `GET /api/layers/L-00` (granice)
+
+> **Uwaga architektoniczna:** `L-00` to świadomy wyjątek poza mechanizmem
+> config-driven layers (tabela `layer_config`). Granice administracyjne są danymi
+> statycznymi serwowanymi z pliku GeoJSON, nie z bazy — nie podlegają odświeżaniu
+> przez WebSocket i nie mają rekordu w `layer_config`. Frontend traktuje `L-00`
+> jako osobne żądanie inicjalizacyjne, niezależne od listy `GET /api/layers`.
 
 ### Pobranie z GADM 4.1
 

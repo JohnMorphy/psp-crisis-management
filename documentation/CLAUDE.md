@@ -27,15 +27,27 @@ Użytkownik wybiera scenariusz zagrożenia (np. powódź Q100)
     → zapisuje do tabeli strefy_zagrozen
     → publisher.publishEvent(new ThreatUpdatedEvent(...))     [wątek HTTP kończy się tutaj — 202]
 
-        [@Async] IkeAgent.onThreatUpdated()     → przelicza IKE dla wszystkich placówek
-        [@Async] DecisionAgent.onThreatUpdated() → generuje rekomendacje ewakuacyjne
-        [@Async] LiveFeedService.onThreatUpdated() → pushuje aktualizację przez WebSocket
+        [@Async] IkeAgent.onThreatUpdated()
+            → przelicza IKE dla wszystkich placówek
+            → zapisuje wyniki do ike_results
+            → publisher.publishEvent(new IkeRecalculatedEvent(...))
+
+        [@Async] LiveFeedService.onThreatUpdated()
+            → pushuje /topic/layers/L-03 (nowe strefy) i /topic/system (status importu)
+
+        [@Async] DecisionAgent.onIkeRecalculated()          ← słucha IkeRecalculatedEvent
+            → generuje rekomendacje ewakuacyjne na podstawie gotowych wyników IKE
+            → zapisuje do evacuation_decisions
+
+        [@Async] LiveFeedService.onIkeRecalculated()        ← słucha IkeRecalculatedEvent
+            → pushuje /topic/ike i /topic/decisions
             → frontend odbiera event i odświeża mapę automatycznie
 ```
 
-**IKE nie jest wywoływane ręcznie przez API.** Przelicza się wyłącznie w reakcji
-na `ThreatUpdatedEvent`. Endpoint `POST /api/ike/recalculate` publikuje ten event —
-nie wywołuje IkeService bezpośrednio.
+**Kluczowa zasada sekwencji:** `DecisionAgent` i push IKE/rekomendacji przez WebSocket
+reagują na `IkeRecalculatedEvent` — **nie** na `ThreatUpdatedEvent`. Gwarantuje to
+że rekomendacje są zawsze generowane na podstawie kompletnych wyników IKE,
+eliminując race condition.
 
 ---
 
@@ -145,9 +157,9 @@ tworzysz lub konsumujesz dane.
 | Agent / Serwis | Odpowiedzialność | Wyzwalacz |
 |---|---|---|
 | `FloodImportAgent` | Pobieranie danych WFS, konwersja GML→GeoJSON, zapis do `strefy_zagrozen`, publikacja `ThreatUpdatedEvent` | HTTP `POST /api/threat/flood/import` |
-| `IkeAgent` | Przeliczanie IKE dla wszystkich placówek, zapis do `ike_results` | `@EventListener ThreatUpdatedEvent` |
-| `DecisionAgent` | Generowanie rekomendacji ewakuacyjnych na podstawie IKE, zapis do `evacuation_decisions` | `@EventListener ThreatUpdatedEvent` |
-| `LiveFeedService` | Push aktualizacji przez WebSocket do frontendu | `@EventListener ThreatUpdatedEvent` |
+| `IkeAgent` | Przeliczanie IKE dla wszystkich placówek, zapis do `ike_results`, publikacja `IkeRecalculatedEvent` | `@EventListener ThreatUpdatedEvent` |
+| `DecisionAgent` | Generowanie rekomendacji ewakuacyjnych na podstawie gotowych wyników IKE, zapis do `evacuation_decisions` | `@EventListener IkeRecalculatedEvent` |
+| `LiveFeedService` | Push stref i statusu po imporcie; push IKE i rekomendacji po przeliczeniu | `@EventListener ThreatUpdatedEvent` (strefy) + `@EventListener IkeRecalculatedEvent` (IKE/decyzje) |
 
 ### Dane
 - ✅ Pliki seed (`seed_*.sql`) służą wyłącznie do inicjalizacji bazy. Nie są odczytywane
@@ -262,4 +274,4 @@ Szczegóły: `docs/DEPLOYMENT.md`.
 | Kontrakty API | `docs/API_REFERENCE.md` |
 | Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
 | Konfiguracja warstw | tabela `layer_config` — seed: `db/seed_layers.sql` |
-| Wagi IKE | `frontend/src/config/ike.config.json` |
+| Wagi IKE | `backend/src/main/resources/ike.config.json` (frontend pobiera przez `GET /api/ike/config`) |
