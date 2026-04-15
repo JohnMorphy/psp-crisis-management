@@ -113,7 +113,42 @@ curl -s http://localhost:8080/actuator/health | jq .status
 
 ---
 
-### ⬜ 1.3 — Encje JPA i repozytoria
+### ⬜ 1.3 — Setup frontend (Vite + React + Leaflet)
+
+**Pliki do stworzenia:**
+- `frontend/package.json`
+- `frontend/vite.config.js`
+- `frontend/tailwind.config.js`
+- `frontend/src/main.jsx`
+- `frontend/src/App.jsx`
+- `frontend/src/services/api.js`
+- `frontend/src/components/layout/AppShell.jsx`
+- `frontend/src/components/layout/Header.jsx`
+
+**Dokumenty referencyjne:** `CLAUDE.md` (sekcja Stack technologiczny, Layout aplikacji)
+
+**Opis:**
+Vite + React 18 + Tailwind CSS. Zależności npm: `react-leaflet`, `leaflet`, `zustand`,
+`@tanstack/react-query`, `axios`.
+Layout 70/30: mapa po lewej (placeholder `<div>`), panel boczny po prawej (Do wykonania w przyszłym zadaniu)
+`api.js` — klient axios z `baseURL` z `VITE_API_BASE_URL`.
+Ciemny motyw: `bg-gray-900`.
+
+**Weryfikacja:**
+```bash
+cd frontend
+npm install
+npm run build   # 0 błędów
+npm run dev
+# http://localhost:5173 — widoczny layout z headerem
+# DevTools: brak błędów konsoli
+```
+
+**Commit:** `feat(1.3): Vite + React 18 + Tailwind — AppShell, Header, api.js`
+
+---
+
+### ⬜ 1.4 — Encje JPA i repozytoria
 
 **Pliki do stworzenia:**
 - `backend/.../model/Placowka.java`
@@ -144,11 +179,11 @@ curl -s http://localhost:8080/actuator/health
 # Brak błędów Hibernate w logach (grep "ERROR" w output mvnw)
 ```
 
-**Commit:** `feat(1.3): encje JPA — Placowka, LayerConfig, StrefaZagrozen, repozytoria`
+**Commit:** `feat(1.4): encje JPA — Placowka, LayerConfig, StrefaZagrozen, repozytoria`
 
 ---
 
-### ⬜ 1.4 — GeoService + GeoJSON granic + endpoint warstw
+### ⬜ 1.5 — GeoService + GeoJSON granic + endpoint warstw
 
 **Pliki do stworzenia:**
 - `backend/.../service/GeoService.java`
@@ -185,11 +220,11 @@ curl -s http://localhost:8080/api/layers/L-99 | jq .code
 # oczekiwane: "LAYER_NOT_FOUND"
 ```
 
-**Commit:** `feat(1.4): GeoService + GeoController — GET /api/layers, granice administracyjne`
+**Commit:** `feat(1.5): GeoService + GeoController — GET /api/layers, granice administracyjne`
 
 ---
 
-### ⬜ 1.5 — IkeAgent (wersja synchroniczna) + IkeController
+### ⬜ 1.6 — IkeAgent (wersja synchroniczna) + IkeController
 
 **Pliki do stworzenia:**
 - `backend/.../agent/IkeAgent.java` (wersja v1.0 — bez eventów, wywołanie synchroniczne)
@@ -232,42 +267,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
   -c "SELECT placowka_kod, ike_score, ike_kategoria FROM ike_results ORDER BY ike_score DESC LIMIT 5;"
 ```
 
-**Commit:** `feat(1.5): IkeAgent synchroniczny + IkeController + ike.config.json`
-
----
-
-### ⬜ 1.6 — Setup frontend (Vite + React + Leaflet)
-
-**Pliki do stworzenia:**
-- `frontend/package.json`
-- `frontend/vite.config.js`
-- `frontend/tailwind.config.js`
-- `frontend/src/main.jsx`
-- `frontend/src/App.jsx`
-- `frontend/src/services/api.js`
-- `frontend/src/components/layout/AppShell.jsx`
-- `frontend/src/components/layout/Header.jsx`
-
-**Dokumenty referencyjne:** `CLAUDE.md` (sekcja Stack technologiczny, Layout aplikacji)
-
-**Opis:**
-Vite + React 18 + Tailwind CSS. Zależności npm: `react-leaflet`, `leaflet`, `zustand`,
-`@tanstack/react-query`, `axios`.
-Layout 70/30: mapa po lewej (placeholder `<div>`), panel boczny po prawej.
-`api.js` — klient axios z `baseURL` z `VITE_API_BASE_URL`.
-Ciemny motyw: `bg-gray-900`.
-
-**Weryfikacja:**
-```bash
-cd frontend
-npm install
-npm run build   # 0 błędów
-npm run dev
-# http://localhost:5173 — widoczny layout z headerem
-# DevTools: brak błędów konsoli
-```
-
-**Commit:** `feat(1.6): Vite + React 18 + Tailwind — AppShell, Header, api.js`
+**Commit:** `feat(1.6): IkeAgent synchroniczny + IkeController + ike.config.json`
 
 ---
 
