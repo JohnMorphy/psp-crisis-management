@@ -66,7 +66,7 @@ gis-dashboard/                  # katalog główny repo (jeden Git)
 ├── backend/                    # aplikacja Spring Boot (Maven)
 │   ├── pom.xml
 │   └── src/
-└── docs/                       # dokumentacja projektu
+└── documentation/                       # dokumentacja projektu
     ├── PRD.md
     ├── ARCHITEKTURA_PLAN.md
     ├── DATA_SCHEMA.md
@@ -90,15 +90,15 @@ swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (ST
 
 | Plik | Zawartość |
 |---|---|
-| `docs/PRD.md` | Wymagania funkcjonalne, model działania, user stories |
-| `docs/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, plan iteracji |
-| `docs/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
-| `docs/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
-| `docs/API_REFERENCE.md` | Kontrakty REST z przykładami request/response |
-| `docs/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
+| `documentation/PRD.md` | Wymagania funkcjonalne, model działania, user stories |
+| `documentation/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, plan iteracji |
+| `documentation/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
+| `documentation/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
+| `documentation/API_REFERENCE.md` | Kontrakty REST z przykładami request/response |
+| `documentation/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
 
 **Zasada:** przed implementacją dowolnego modułu przeczytaj najpierw odpowiednią sekcję
-`docs/ARCHITEKTURA_PLAN.md` (plan iteracji), a następnie `docs/DATA_SCHEMA.md` jeśli
+`documentation/ARCHITEKTURA_PLAN.md` (plan iteracji), a następnie `documentation/DATA_SCHEMA.md` jeśli
 tworzysz lub konsumujesz dane.
 
 ---
@@ -259,7 +259,7 @@ docker compose -f docker-compose.full.yml up --build
 # Frontend: http://localhost:3000  |  Backend: http://localhost:8080
 ```
 
-Szczegóły: `docs/DEPLOYMENT.md`.
+Szczegóły: `documentation/DEPLOYMENT.md`.
 
 ---
 
@@ -268,10 +268,10 @@ Szczegóły: `docs/DEPLOYMENT.md`.
 | Szukam... | Ścieżka |
 |---|---|
 | Definicja eventu | `backend/.../event/ThreatUpdatedEvent.java` |
-| Logika IKE | `backend/.../agent/IkeAgent.java` + `docs/IKE_ALGORITHM.md` |
+| Logika IKE | `backend/.../agent/IkeAgent.java` + `documentation/IKE_ALGORITHM.md` |
 | Import WFS | `backend/.../agent/FloodImportAgent.java` |
 | Rekomendacje | `backend/.../agent/DecisionAgent.java` |
-| Kontrakty API | `docs/API_REFERENCE.md` |
-| Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
+| Kontrakty API | `documentation/API_REFERENCE.md` |
+| Schematy SQL + seed | `documentation/DATA_SCHEMA.md` |
 | Konfiguracja warstw | tabela `layer_config` — seed: `db/seed_layers.sql` |
 | Wagi IKE | `backend/src/main/resources/ike.config.json` (frontend pobiera przez `GET /api/ike/config`) |

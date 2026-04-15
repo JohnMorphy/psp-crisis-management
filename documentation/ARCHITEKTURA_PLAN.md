@@ -270,7 +270,7 @@ Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @Async
 
 Algorytm:
 1. Pobierz wszystkie placówki z tabeli placowka
-2. Dla każdej placówki oblicz IKE (szczegóły: docs/IKE_ALGORITHM.md)
+2. Dla każdej placówki oblicz IKE (szczegóły: documentation/IKE_ALGORITHM.md)
 3. Upsert wyników do tabeli ike_results
 4. publisher.publishEvent(new IkeRecalculatedEvent(correlationId))
 
@@ -330,7 +330,7 @@ Działanie po IkeRecalculatedEvent:
 ## 5. Struktura katalogów
 
 ```
-gis-dashboard/
+./
 │
 ├── CLAUDE.md
 ├── docker-compose.yml
@@ -500,7 +500,7 @@ gis-dashboard/
 │               ├── seed_transport.sql
 │               └── seed_strefy.sql
 │
-└── docs/
+└── documentation/
     ├── PRD.md
     ├── ARCHITEKTURA_PLAN.md
     ├── DATA_SCHEMA.md
@@ -543,7 +543,7 @@ public void onThreatUpdated(ThreatUpdatedEvent event) { ... }
 
 ## 7. Schemat danych (fragment)
 
-Pełne DDL: `docs/DATA_SCHEMA.md`.
+Pełne DDL: `documentation/DATA_SCHEMA.md`.
 
 ### Nowa tabela: `evacuation_decisions`
 
