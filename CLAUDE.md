@@ -91,15 +91,15 @@ swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (ST
 | Plik | Zawartość |
 |---|---|
 | `documentation/PRD.md` | Wymagania funkcjonalne, model działania, user stories |
-| `documentation/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, plan iteracji |
+| `documentation/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, cele iteracji |
+| `documentation/BACKLOG.md` | **Zadania agentowe** — jedyne źródło prawdy dla planu implementacji. Czytaj przed każdym zadaniem. |
 | `documentation/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
 | `documentation/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
-| `documentation/API_REFERENCE.md` | Kontrakty REST z przykładami request/response |
+| `documentation/API_REFERENCE.md` | Kontrakty REST i WebSocket z przykładami request/response |
 | `documentation/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
 
-**Zasada:** przed implementacją dowolnego modułu przeczytaj najpierw odpowiednią sekcję
-`documentation/ARCHITEKTURA_PLAN.md` (plan iteracji), a następnie `documentation/DATA_SCHEMA.md` jeśli
-tworzysz lub konsumujesz dane.
+**Zasada:** przed implementacją dowolnego modułu przeczytaj najpierw odpowiednie zadanie
+w `documentation/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 ---
 
@@ -275,3 +275,105 @@ Szczegóły: `documentation/DEPLOYMENT.md`.
 | Schematy SQL + seed | `documentation/DATA_SCHEMA.md` |
 | Konfiguracja warstw | tabela `layer_config` — seed: `db/seed_layers.sql` |
 | Wagi IKE | `backend/src/main/resources/ike.config.json` (frontend pobiera przez `GET /api/ike/config`) |
+
+---
+
+## Reguły pracy agentowej
+
+Ta sekcja obowiązuje w każdej sesji implementacyjnej. Czytaj przed rozpoczęciem zadania.
+
+### Jedno zadanie = jeden commit
+
+Każda sesja implementuje **dokładnie jedno zadanie** z `documentation/BACKLOG.md`.
+Zadanie jest skończone gdy: kod działa + weryfikacja przeszła.
+Nie zaczynaj kolejnego zadania w tej samej sesji.
+
+Docelowy rozmiar zmiany: **50–200 linii kodu netto**. Przekroczenie 300 linii
+w jednym zadaniu to sygnał że zadanie było za duże i należało je podzielić.
+
+Nie wykonuj operacji git - zmiany przechodzą przez review człowieka.
+
+```
+# Prawidłowy workflow jednej sesji:
+1. Przeczytaj zadanie z BACKLOG.md (sekcja "Aktywne zadanie")
+2. Przeczytaj wskazane dokumenty referencyjne
+3. Zaimplementuj — tylko to co opisuje zadanie, nic więcej
+4. Przeprowadź weryfikację z checklisty zadania
+5. Przygotuj krótki opis zmian "feat(X.Y): krótki opis"
+6. Zaktualizuj status zadania w BACKLOG.md (⬜ → ✅)
+7. Koniec sesji
+```
+
+### Format komunikatu commit
+
+```
+feat(1.2): docker-compose.yml + PostgreSQL + PostGIS
+feat(1.5): CorsConfig.java
+feat(2.3): IkeAgent refaktor na @EventListener @Async
+fix(1.9): poprawka encji Placowka — brakujące pole geom
+```
+
+Prefiks: `feat` dla nowego kodu, `fix` dla poprawek, `docs` dla dokumentacji.
+Numer w nawiasie = numer zadania z BACKLOG.md.
+
+### Zakres zadania — czego nie robić
+
+- ❌ Nie implementuj funkcji spoza aktywnego zadania, nawet jeśli "przy okazji" widzisz potrzebę
+- ❌ Nie refaktoruj kodu z poprzednich zadań jeśli nie jest to wymagane
+- ❌ Nie dodawaj zależności Maven/npm bez wcześniejszego wpisu w zadaniu
+- ✅ Jeśli widzisz problem poza zakresem — zapisz go jako notatkę w BACKLOG.md sekcja "Dług techniczny"
+
+### Weryfikacja
+
+Każde zadanie w BACKLOG.md ma własną checklistę weryfikacji.
+Ogólna zasada minimalna dla każdego zadania backendowego:
+
+```bash
+# 1. Backend kompiluje się bez błędów
+./mvnw compile -q
+
+# 2. Baza dostępna i seed wykonany
+docker compose ps postgres   # status: healthy
+docker compose exec postgres psql -U lublin -d gis_dashboard \
+  -c "SELECT COUNT(*) FROM placowka;"   # oczekiwane: 48
+
+# 3. Endpoint odpowiada
+curl -s http://localhost:8080/api/layers | jq '. | length'   # oczekiwane: 7
+```
+
+Dla zadań frontendowych minimum:
+```bash
+# Brak błędów TypeScript/ESLint
+npm run build   # musi przejść bez błędów
+```
+
+### Izolacja kontekstu między sesjami
+
+Każda nowa sesja zaczyna się od przeczytania:
+1. Tego pliku (`CLAUDE.md`) — aktualny stan projektu
+2. `documentation/BACKLOG.md` — które zadanie jest następne
+3. Dokumentów wskazanych przez to zadanie
+
+Nie zakładaj że pamiętasz cokolwiek z poprzedniej sesji.
+Jeśli coś jest niejasne — sprawdź w dokumentacji, nie zgaduj.
+
+### Ignorowane pliki i katalogi
+
+Nie czytaj ani nie modyfikuj zawartości:
+```
+node_modules/
+dist/
+build/
+target/
+*.geojson          # duże pliki granic — tylko GeoService je czyta
+*.class
+.env
+```
+
+### Kiedy zatrzymać się i zapytać
+
+Zatrzymaj implementację i zadaj pytanie użytkownikowi gdy:
+- Zadanie wymaga decyzji architektonicznej nieopisanej w dokumentacji
+- Napotkasz sprzeczność między dokumentami
+- Weryfikacja nie przechodzi po 2 próbach naprawy
+- Zakres zadania okazuje się znacznie większy niż 200 linii

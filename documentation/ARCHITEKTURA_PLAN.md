@@ -592,110 +592,21 @@ ALTER TABLE strefy_zagrozen
 
 ## 9. Kolejność implementacji
 
-### ITERACJA v1.0 — Fundament GIS
+Szczegółowe zadania agentowe z definicjami ukończenia i krokami weryfikacji:
+**`documentation/BACKLOG.md`** — jedyne źródło prawdy dla planu implementacji.
 
-> Cel: działająca mapa z DPS-ami, Spring Boot serwuje dane z PostgreSQL przez REST.
+Poniżej wyłącznie cele iteracji (co i dlaczego), bez listy kroków:
 
-| Krok | Plik / zadanie | Opis |
-|---|---|---|
-| 1.1 | `docker-compose.yml` | PostgreSQL + PostGIS w kontenerze |
-| 1.2 | `db/schema.sql` | DDL: wszystkie tabele + PostGIS |
-| 1.3 | `DashboardApplication.java` + `pom.xml` | Setup Spring Boot 3, zależności Maven |
-| 1.4 | `DataSourceConfig.java` + `application-dev.yml` | Połączenie z PostgreSQL |
-| 1.5 | `CorsConfig.java` | CORS dla frontendu |
-| 1.6 | `db/seed_layers.sql` + `db/seed_dps.sql` | Seed 7 warstw + 48 DPS-ów |
-| 1.7 | Pliki GeoJSON granic | Pobieranie z GADM 4.1 → `resources/geojson/` |
-| 1.8 | `db/seed_strefy.sql` | Seed syntetycznych stref zagrożenia |
-| 1.9 | Encje JPA + repozytoria | `Placowka`, `LayerConfig`, `StrefaZagrozen` |
-| 1.10 | `GeoService.java` | Ładowanie GeoJSON z plików i bazy |
-| 1.11 | `GeoController.java` + `LayerConfigController.java` | `GET /api/layers`, `GET /api/layers/{id}` |
-| 1.12 | `IkeAgent.java` (wersja uproszczona) | Obliczanie IKE bez eventów (na żądanie) |
-| 1.13 | `IkeController.java` | `GET /api/ike`, `GET /api/ike/{kod}` |
-| 1.14 | Vite + React 18 + Tailwind | Setup frontend |
-| 1.15 | `services/api.js` | Klient axios |
-| 1.16 | `AppShell.jsx` + `Header.jsx` | Layout 70/30 |
-| 1.17 | `MapContainer.jsx` | Leaflet, viewport na Lublin |
-| 1.18 | `AdminBoundaries.jsx` | GeoJSON powiatów i gmin |
-| 1.19 | `DPSLayer.jsx` + `DPSPopup.jsx` | Markery DPS-ów z IKE |
-| 1.20 | `ZagrozeniaLayer.jsx` | Strefy zagrożeń (poligony) |
-| 1.21 | `RegionInfoPanel.jsx` + `LayerControlPanel.jsx` | Panele boczne |
-
-**Deliverable v1.0:** Mapa z DPS-ami i strefami. IKE liczone na żądanie przez REST.
+| Iteracja | Cel |
+|---|---|
+| **v1.0 — Fundament GIS** | Działająca mapa z DPS-ami. Spring Boot serwuje dane z PostgreSQL przez REST. IKE liczone na żądanie. |
+| **v1.1 — Event-driven core** | Pełny flow: wybór scenariusza → ThreatUpdatedEvent → IKE → IkeRecalculatedEvent → rekomendacje + WebSocket push. |
+| **v1.2 — Import i kalkulatory** | Prawdziwy import WFS ISOK z fallbackiem syntetycznym. Trzy kalkulatory zasobów. Scraper HTML/XLSX. |
+| **v1.3 — UX i głos** | Asystent głosowy (Web Speech API + Whisper). Pełny Docker stack produkcyjny. |
 
 ---
 
-### ITERACJA v1.1 — Event-driven core
-
-> Cel: pełny flow event-driven — wybór scenariusza → event → IKE → rekomendacje → WebSocket.
-
-| Krok | Plik / zadanie | Opis |
-|---|---|---|
-| 2.1 | `ThreatUpdatedEvent.java` + `IkeRecalculatedEvent.java` | Klasy eventów |
-| 2.2 | `AsyncConfig.java` | Pula wątków dla agentów (`@EnableAsync`) |
-| 2.3 | `IkeAgent.java` (refaktor) | Zmiana z serwisu na `@EventListener @Async` |
-| 2.4 | `DecisionAgent.java` | `@EventListener(IkeRecalculatedEvent)` → rekomendacje |
-| 2.5 | `EvacuationDecision.java` + `EvacuationDecisionRepository.java` | Encja + repozytorium |
-| 2.6 | `FloodImportAgent.java` (stub) | Przyjmuje request, generuje syntetyczne strefy, publikuje event |
-| 2.7 | `ThreatController.java` | `POST /api/threat/flood/import`, `POST /api/threat/clear` |
-| 2.8 | `WebSocketConfig.java` | STOMP + SockJS |
-| 2.9 | `LiveFeedService.java` | `@EventListener(ThreatUpdatedEvent)` → push stref; `@EventListener(IkeRecalculatedEvent)` → push IKE + rekomendacji |
-| 2.10 | `DecisionController.java` | `GET /api/decisions` |
-| 2.11 | `services/websocketService.js` + `hooks/useWebSocket.js` | WebSocket client React |
-| 2.12 | `components/panels/ScenarioPanel.jsx` | UI wyboru scenariusza |
-| 2.13 | `components/panels/DecisionPanel.jsx` | UI rekomendacji |
-| 2.14 | `Top10Panel.jsx` + `FilterPanel.jsx` | Panele z IKE |
-| 2.15 | Pozostałe warstwy L-02, L-04…L-07 | Komponenty React + dane seed |
-| 2.16 | `utils/colorScale.js` + `IKEScore.jsx` | Kolorowanie wg IKE |
-| 2.17 | `EvacuationRoute.jsx` + `routingService.js` | Trasy OSRM |
-
-**Deliverable v1.1:** Pełny flow event-driven. Wybór scenariusza uruchamia
-automatyczne przeliczenie IKE i rekomendacje widoczne w UI przez WebSocket.
-
----
-
-### ITERACJA v1.2 — Import WFS i kalkulatory
-
-> Cel: prawdziwy import z WFS ISOK z fallbackiem syntetycznym, 3 kalkulatory, scraper.
-
-| Krok | Plik / zadanie | Opis |
-|---|---|---|
-| 3.1 | `WfsClientService.java` | Klient HTTP dla WFS ISOK (GML→GeoJSON, EPSG:2180→4326) |
-| 3.2 | `FloodImportAgent.java` (pełny) | Prawdziwy WFS + fallback syntetyczny |
-| 3.3 | `KalkulatorService.java` | Logika kalkulatorów z `ST_DWithin` |
-| 3.4 | `KalkulatorController.java` | `POST /api/calculate/transport`, `relocation`, `threat` |
-| 3.5 | `TransportCalculator.jsx` | UI kalkulator 1 |
-| 3.6 | `RelocationCalculator.jsx` | UI kalkulator 2 |
-| 3.7 | `ThreatSpreadCalculator.jsx` | UI kalkulator 3 |
-| 3.8 | `CalculatorHub.jsx` | Drawer z wyborem kalkulatora |
-| 3.9 | `ScraperService.java` + `JsoupScraperService.java` | Scraper HTML |
-| 3.10 | `XlsxParserService.java` | Parser XLSX |
-| 3.11 | `ScraperController.java` | `POST /api/scraper/run`, `GET /api/scraper/log` |
-| 3.12 | `hooks/useLayerData.js` | React Query + auto-refresh |
-
-**Deliverable v1.2:** Import z WFS działa (z fallbackiem). Wszystkie 3 kalkulatory
-zwracają wyniki. Scraper pobiera dane z ≥1 źródła.
-
----
-
-### ITERACJA v1.3 — UX i głos
-
-> Cel: asystent głosowy, pełny Docker stack, testy wydajnościowe.
-
-| Krok | Plik / zadanie | Opis |
-|---|---|---|
-| 4.1 | `CommandParser.js` + `hooks/useVoiceCommands.js` | Komendy głosowe PL |
-| 4.2 | `VoiceAssistant.jsx` + `VoiceButton.jsx` | UI asystenta |
-| 4.3 | `services/geocoder.js` | Geokodowanie toponimów z komend |
-| 4.4 | `backend/Dockerfile` | Obraz Docker Spring Boot |
-| 4.5 | `frontend/Dockerfile` + `nginx.conf` | Obraz Docker Nginx |
-| 4.6 | `docker-compose.full.yml` (finalizacja) | Kompletny stack |
-| 4.7 | `application-prod.yml` | Konfiguracja produkcyjna |
-
-**Deliverable v1.3:** Kompletny system z asystentem głosowym i gotowym stackiem Docker.
-
----
-
-## 10. Ryzyki
+## 10. Ryzyka
 
 | Ryzyko | Mitygacja |
 |---|---|
