@@ -17,22 +17,44 @@ lub tablecie podczas briefingu kryzysowego. System odpowiada na pytanie:
 
 ---
 
+## Paradygmat: event-driven
+
+System działa reaktywnie na zdarzenia. Centralny event to **`ThreatUpdatedEvent`**.
+
+```
+Użytkownik wybiera scenariusz zagrożenia (np. powódź Q100)
+    → FloodImportAgent pobiera dane z WFS (ISOK/RZGW) lub generuje syntetyczne
+    → zapisuje do tabeli strefy_zagrozen
+    → publisher.publishEvent(new ThreatUpdatedEvent(...))     [wątek HTTP kończy się tutaj — 202]
+
+        [@Async] IkeAgent.onThreatUpdated()     → przelicza IKE dla wszystkich placówek
+        [@Async] DecisionAgent.onThreatUpdated() → generuje rekomendacje ewakuacyjne
+        [@Async] LiveFeedService.onThreatUpdated() → pushuje aktualizację przez WebSocket
+            → frontend odbiera event i odświeża mapę automatycznie
+```
+
+**IKE nie jest wywoływane ręcznie przez API.** Przelicza się wyłącznie w reakcji
+na `ThreatUpdatedEvent`. Endpoint `POST /api/ike/recalculate` publikuje ten event —
+nie wywołuje IkeService bezpośrednio.
+
+---
+
 ## Struktura repozytorium
 
 ```
-gis-dashboard/                  ← katalog główny repo (jeden Git)
-├── CLAUDE.md                   ← ten plik
-├── docker-compose.yml          ← tryb dev: tylko PostgreSQL + PostGIS
-├── docker-compose.full.yml     ← tryb full-stack: postgres + backend + frontend
+gis-dashboard/                  # katalog główny repo (jeden Git)
+├── CLAUDE.md
+├── docker-compose.yml          # tryb dev: tylko PostgreSQL + PostGIS
+├── docker-compose.full.yml     # tryb full-stack: postgres + backend + frontend
 ├── .env.example
 ├── .gitignore
-├── frontend/                   ← aplikacja React (Vite)
+├── frontend/                   # aplikacja React (Vite)
 │   ├── package.json
 │   └── src/
-├── backend/                    ← aplikacja Spring Boot (Maven)
+├── backend/                    # aplikacja Spring Boot (Maven)
 │   ├── pom.xml
 │   └── src/
-└── docs/                       ← dokumentacja projektu
+└── docs/                       # dokumentacja projektu
     ├── PRD.md
     ├── ARCHITEKTURA_PLAN.md
     ├── DATA_SCHEMA.md
@@ -56,12 +78,12 @@ swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (ST
 
 | Plik | Zawartość |
 |---|---|
-| `docs/PRD.md` | Wymagania funkcjonalne i niefunkcjonalne, user stories, kryteria akceptacji |
-| `docs/ARCHITEKTURA_PLAN.md` | Stack technologiczny, struktura katalogów, plan iteracji krok po kroku |
-| `docs/DATA_SCHEMA.md` | Schematy SQL i JSON seed dla każdego datasetu — czytaj przed tworzeniem/modyfikacją danych |
-| `docs/IKE_ALGORITHM.md` | Formuła algorytmu IKE z wagami, edge case'ami i przykładami obliczeń |
-| `docs/API_REFERENCE.md` | Kontrakty REST: endpoint, metoda, request body, response (z przykładami JSON) |
-| `docs/DEPLOYMENT.md` | Instrukcja uruchomienia dev i prod, zmienne środowiskowe, troubleshooting |
+| `docs/PRD.md` | Wymagania funkcjonalne, model działania, user stories |
+| `docs/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, plan iteracji |
+| `docs/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
+| `docs/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
+| `docs/API_REFERENCE.md` | Kontrakty REST z przykładami request/response |
+| `docs/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
 
 **Zasada:** przed implementacją dowolnego modułu przeczytaj najpierw odpowiednią sekcję
 `docs/ARCHITEKTURA_PLAN.md` (plan iteracji), a następnie `docs/DATA_SCHEMA.md` jeśli
@@ -72,81 +94,81 @@ tworzysz lub konsumujesz dane.
 ## Stack technologiczny — decyzje ostateczne
 
 ### Frontend (`frontend/`)
-- **React 18 + Vite** — framework UI
+- **React 18 + Vite**
 - **React-Leaflet** — jedyna biblioteka map. Nie używaj MapLibre GL JS.
-- **Zustand** — state management (aktywne warstwy, filtry, stan UI)
-- **TanStack Query (React Query)** — data fetching, cache, auto-refresh
+- **Zustand** — state management
+- **TanStack Query (React Query)** — data fetching, cache
 - **Tailwind CSS** — stylowanie
-- **Recharts** — wykresy i statystyki w panelach bocznych
+- **Recharts** — wykresy w panelach
 - **SockJS + @stomp/stompjs** — WebSocket client (live feed)
-- **Web Speech API** — asystent głosowy (wbudowany w przeglądarkę, bez klucza API)
+- **Web Speech API** — asystent głosowy (+ fallback Whisper API)
 
 ### Backend (`backend/`)
-- **Spring Boot 3.x / OpenJDK 21 (LTS)** — framework backendowy
+- **Spring Boot 3.x / OpenJDK 21 (LTS)**
 - **PostgreSQL 15 + PostGIS** — jedyne źródło danych runtime
-- **Spring Data JPA + Hibernate Spatial** — ORM z obsługą geometrii PostGIS
+- **Spring Data JPA + Hibernate Spatial**
+- **Spring ApplicationEventPublisher + `@Async`** — mechanizm eventów
 - **Spring WebSocket + STOMP** — live feed do frontendu
-- **Spring Scheduler** — automatyczne odświeżanie warstw
+- **Spring Scheduler** — harmonogram automatycznego importu danych
+- **GeoTools lub własny klient HTTP** — pobieranie i konwersja danych WFS (GML → GeoJSON, EPSG transformacja)
 - **Jsoup** — scraping HTML stron urzędowych
-- **Apache POI** — parsowanie plików XLSX z urzędów
-- **Maven** — zarządzanie zależnościami (nie Gradle)
+- **Apache POI** — parsowanie XLSX
+- **Maven**
 
 ### Infrastruktura
-- **Docker + docker-compose** — środowisko dev (baza) i full-stack deploy
-- **OSRM public API** — wyznaczanie tras ewakuacji (`https://router.project-osrm.org`)
-- **Nominatim OSM** — geokodowanie adresów (`https://nominatim.openstreetmap.org`)
-- **OpenStreetMap / Leaflet tiles** — podkład mapowy (bez klucza API)
+- **Docker + docker-compose** (dwa tryby)
+- **OSRM public API** — trasy ewakuacji
+- **Nominatim OSM** — geokodowanie
+- **OpenStreetMap / Leaflet tiles** — podkład mapowy
+- **ISOK / RZGW Hydroportal WFS** — dane powodziowe (z syntetycznym fallbackiem)
 
 ---
 
 ## Zasady projektowe — nakazy i zakazy
 
-### Architektura i dane
-- ✅ **Database-first:** jedyne źródło danych runtime to **PostgreSQL**.
-  Pliki w `frontend/src/data/` i `backend/src/main/resources/db/` to wyłącznie
-  materiał do seedowania bazy — nie są odczytywane przez aplikację w runtime.
-- ✅ Logika IKE żyje **wyłącznie** w `IkeService.java`. Frontend konsumuje wynik przez REST.
-- ✅ Każda warstwa GIS opisana jest jednym rekordem w tabeli `layer_config`.
-  Dodanie nowej warstwy = zmiana tylko w bazie, zero zmian w kodzie aplikacji.
-- ✅ Operacje geoprzestrzenne realizowane przez **PostGIS**
-  (`ST_DWithin`, `ST_Contains`, `ST_Intersects`) — nie w Javie ani JavaScript.
-- ✅ Komponenty React są atomowe — mapa, panel boczny, kalkulatory, social feed
-  i asystent głosowy to oddzielne moduły bez twardych zależności między sobą.
+### Architektura
+- ✅ **Database-first:** jedyne źródło danych runtime to PostgreSQL.
+- ✅ **Event-driven:** zmiany stanu zagrożenia publikują `ThreatUpdatedEvent`.
+  Agenci (`IkeAgent`, `DecisionAgent`, `LiveFeedService`) reagują przez `@EventListener`.
+  Nigdy nie wywołuj agentów bezpośrednio z kontrolera.
+- ✅ **`@Async` na listenerach:** każdy `@EventListener` reagujący na `ThreatUpdatedEvent`
+  musi być oznaczony `@Async`. Request HTTP kończy się przed uruchomieniem listenerów.
+- ✅ Każda warstwa GIS = jeden rekord w tabeli `layer_config`. Dodanie warstwy = INSERT,
+  zero zmian w kodzie.
+- ✅ Logika IKE wyłącznie w `IkeAgent`. Frontend konsumuje wynik przez REST lub WebSocket.
+- ✅ Operacje geoprzestrzenne przez **PostGIS** — nie w Javie ani JavaScript.
+- ❌ Nie wywołuj `IkeAgent` ani `DecisionAgent` bezpośrednio z kontrolerów.
+  Jedyna droga to `publisher.publishEvent(new ThreatUpdatedEvent(...))`.
+
+### Agenci — odpowiedzialności
+
+| Agent / Serwis | Odpowiedzialność | Wyzwalacz |
+|---|---|---|
+| `FloodImportAgent` | Pobieranie danych WFS, konwersja GML→GeoJSON, zapis do `strefy_zagrozen`, publikacja `ThreatUpdatedEvent` | HTTP `POST /api/threat/flood/import` |
+| `IkeAgent` | Przeliczanie IKE dla wszystkich placówek, zapis do `ike_results` | `@EventListener ThreatUpdatedEvent` |
+| `DecisionAgent` | Generowanie rekomendacji ewakuacyjnych na podstawie IKE, zapis do `evacuation_decisions` | `@EventListener ThreatUpdatedEvent` |
+| `LiveFeedService` | Push aktualizacji przez WebSocket do frontendu | `@EventListener ThreatUpdatedEvent` |
 
 ### Dane
-- ✅ Pliki seed (`seed_dps.sql`, `seed_relokacja.sql` itp.) używają **prawdziwych nazw
-  miejscowości i powiatów** województwa lubelskiego.
-- ✅ Schematy SQL są źródłem prawdy o strukturze danych — patrz `docs/DATA_SCHEMA.md`.
-  Pliki JSON w `frontend/src/data/` są generowane ze schematów SQL, nie odwrotnie.
-- ✅ Pola w SQL używają **snake_case** (np. `liczba_podopiecznych`, `niesamodzielni_procent`).
-- ✅ Źródło każdego rekordu oznaczone jest polem `zrodlo`:
-  `'syntetyczne'` | `'scraping'` | `'mpips'`.
+- ✅ Pliki seed (`seed_*.sql`) służą wyłącznie do inicjalizacji bazy. Nie są odczytywane
+  w runtime.
+- ✅ Pola SQL: **snake_case**. Package root Java: `pl.lublin.dashboard`.
+- ✅ `zrodlo` w każdym rekordzie: `'syntetyczne'` | `'wfs'` | `'scraping'` | `'mpips'`.
 
 ### Kod
-- ✅ Nazwy plików: **tylko ASCII**, bez polskich znaków.
-  Poprawnie: `BialePlamiLayer.jsx`, nie `BiałePlamiLayer.jsx`.
-- ✅ Komponenty React: **PascalCase**. Hooki: `use` + PascalCase. Serwisy JS: camelCase.
-- ✅ Klasy Java: **PascalCase**. Metody i pola: **camelCase**.
-  Package root: `pl.lublin.dashboard`.
-- ✅ Każdy endpoint REST zwraca błędy w formacie:
-  `{ "error": "Opis błędu", "code": "ERROR_CODE", "timestamp": "..." }`.
-- ❌ Nie używaj `@Transactional` na kontrolerach Spring — tylko na serwisach.
-- ❌ Nie hardcoduj URL-i backendu w komponentach React —
-  używaj stałych z `frontend/src/services/api.js`.
-- ❌ Nie używaj `localStorage` ani `sessionStorage` —
-  stan żyje w Zustand lub React Query cache.
+- ✅ Nazwy plików: **tylko ASCII** (np. `BialePlamiLayer.jsx`).
+- ✅ Każdy endpoint REST zwraca błędy:
+  `{ "error": "...", "code": "ERROR_CODE", "timestamp": "..." }`.
+- ❌ Nie używaj `@Transactional` na kontrolerach — tylko na serwisach.
+- ❌ Nie hardcoduj URL-i backendu w komponentach React — używaj `services/api.js`.
+- ❌ Nie używaj `localStorage` ani `sessionStorage`.
 
 ### UI
-- ✅ Mapa zajmuje **minimum 70% szerokości ekranu** (domyślny podział 70/30).
-- ✅ Panel boczny jest **zwijany** — po zwinięciu mapa zajmuje 100%.
-- ✅ Minimum font: **14px** dla wszystkich etykiet na mapie i w panelach.
-- ✅ Kolory IKE:
-  - Czerwony `#EF4444` — IKE ≥ 0.70 (ewakuacja natychmiastowa)
-  - Żółty `#F59E0B` — IKE 0.40–0.69 (przygotowanie)
-  - Zielony `#22C55E` — IKE < 0.40 (brak bezpośredniego zagrożenia)
-- ✅ Ciemny motyw: `bg-gray-900` jako tło aplikacji, `bg-gray-800` dla paneli.
-- ❌ Nie wyświetlaj modali na kliknięcie DPS —
-  używaj **popupów Leaflet** osadzonych w mapie.
+- ✅ Mapa: minimum 70% szerokości. Panel boczny zwijany.
+- ✅ Font minimum 14px. Ciemny motyw (`bg-gray-900` / `bg-gray-800`).
+- ✅ Kolory IKE: czerwony `#EF4444` (≥0.70), żółty `#F59E0B` (0.40–0.69),
+  zielony `#22C55E` (<0.40).
+- ❌ Popup DPS = Leaflet Popup, nie modal.
 
 ---
 
@@ -158,36 +180,27 @@ tworzysz lub konsumujesz dane.
 ├──────────────────────────────────────────┬──────────────────────┤
 │                                          │  PANEL BOCZNY (30%)  │
 │                                          │  ┌────────────────┐  │
-│                                          │  │ LayerControl   │  │
-│                                          │  │ (toggle+czas)  │  │
+│                                          │  │ ScenarioPanel  │  │
+│                                          │  │ (wybór scen.)  │  │
 │         MAPA (70%)                       │  └────────────────┘  │
 │         React-Leaflet                    │  ┌────────────────┐  │
-│         + warstwy GIS                    │  │ FilterPanel    │  │
-│                                          │  │ (region/typ/   │  │
-│                                          │  │  zagrożenie)   │  │
+│         + warstwy GIS                    │  │ LayerControl   │  │
+│                                          │  │ (toggle+czas)  │  │
 │   [Kliknięcie DPS → Popup Leaflet]       │  └────────────────┘  │
 │                                          │  ┌────────────────┐  │
 │                                          │  │ Top10Panel     │  │
 │                                          │  │ (lista IKE)    │  │
 │                                          │  └────────────────┘  │
 │                                          │  ┌────────────────┐  │
-│                                          │  │ RegionInfo     │  │
-│                                          │  │ (po kliknięciu │  │
-│                                          │  │  na powiat)    │  │
+│                                          │  │ DecisionPanel  │  │
+│                                          │  │ (rekomendacje) │  │
 │                                          │  └────────────────┘  │
 ├──────────────────────────────────────────┴──────────────────────┤
-│  [◀ Zwiń panel]  [🗺 Reset widoku]  [⊕ Kalkulatory]  [📡 Social]│
+│  [◀ Zwiń panel]  [🗺 Reset widoku]  [⊕ Kalkulatory]             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Zachowanie panelu bocznego:**
-- Domyślnie rozwinięty po prawej stronie
-- Przycisk `◀` zwija panel; mapa rozszerza się do 100% szerokości
-- Po zwinięciu pasek dolny pokazuje przycisk `▶ Panel` do ponownego rozwinięcia
-- Kalkulatory otwierają się jako **drawer** wysuwany od lewej, nakładający się na mapę
-- Panel Social Media otwiera się jako **drawer** od lewej, pod kalkulatorami
-
-**Popup DPS (Leaflet Popup — nie modal):**
+**Popup DPS:**
 ```
 ┌─────────────────────────────────┐
 │ 🔴 DPS "Nazwa placówki"   [✕]  │
@@ -211,13 +224,10 @@ tworzysz lub konsumujesz dane.
 | Iteracja | Status | Deliverable |
 |---|---|---|
 | v1.0 — Fundament GIS | ⬜ Nie rozpoczęta | Mapa + granice + DPS-y + Spring Boot + PostGIS |
-| v1.1 — Logika kryzysowa | ⬜ Nie rozpoczęta | 7 warstw + IKE + Top10 + trasy + WebSocket |
-| v1.2 — Moduły dodatkowe | ⬜ Nie rozpoczęta | Scraper + 3 kalkulatory + PostGIS queries |
-| v1.3 — AI & głos | ⬜ Nie rozpoczęta | Social media agent + asystent głosowy + Docker |
+| v1.1 — Event-driven core | ⬜ Nie rozpoczęta | ThreatUpdatedEvent + IkeAgent + DecisionAgent + WebSocket |
+| v1.2 — Import i kalkulatory | ⬜ Nie rozpoczęta | FloodImportAgent (WFS) + 3 kalkulatory + Scraper |
+| v1.3 — UX i głos | ⬜ Nie rozpoczęta | ScenarioPanel + asystent głosowy + Docker prod |
 
-**Aktualna iteracja:** brak — projekt nie został jeszcze rozpoczęty.
-
-> Aktualizuj tę tabelę po zakończeniu każdej iteracji:
 > ⬜ Nie rozpoczęta → 🔄 W toku → ✅ Ukończona
 
 ---
@@ -225,20 +235,19 @@ tworzysz lub konsumujesz dane.
 ## Jak uruchomić projekt lokalnie
 
 ```bash
-# Skopiuj zmienne środowiskowe
-cp .env.example .env
-# Uzupełnij co najmniej POSTGRES_PASSWORD w .env
+cp .env.example .env   # uzupełnij POSTGRES_PASSWORD
 
-# --- TRYB DEV (zalecany do codziennej pracy) ---
-# Uruchom tylko bazę danych
+# Tryb dev (zalecany — debugowanie)
 docker compose up -d postgres
-# Następnie backend i frontend lokalnie — patrz docs/DEPLOYMENT.md sekcja 4
+# backend: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# frontend: npm run dev
 
-# --- TRYB FULL-STACK (demo / onboarding / VPS) ---
+# Tryb full-stack (demo / onboarding)
 docker compose -f docker-compose.full.yml up --build
-# Frontend: http://localhost:3000
-# Backend:  http://localhost:8080
+# Frontend: http://localhost:3000  |  Backend: http://localhost:8080
 ```
+
+Szczegóły: `docs/DEPLOYMENT.md`.
 
 ---
 
@@ -246,11 +255,11 @@ docker compose -f docker-compose.full.yml up --build
 
 | Szukam... | Ścieżka |
 |---|---|
-| Konfiguracja warstw GIS | tabela `layer_config` w bazie — seed: `backend/src/main/resources/db/seed_layers.sql` |
-| Wagi algorytmu IKE | `frontend/src/config/ike.config.json` (wczytywane przez backend) |
-| Dane DPS-ów (seed SQL) | `backend/src/main/resources/db/seed_dps.sql` |
-| Schematy tabel SQL | `backend/src/main/resources/db/schema.sql` + `docs/DATA_SCHEMA.md` |
-| Algorytm IKE (opis + edge cases) | `docs/IKE_ALGORITHM.md` |
-| Kontrakty API request/response | `docs/API_REFERENCE.md` |
-| Główny komponent mapy | `frontend/src/components/map/MapContainer.jsx` |
-| Logika IKE (Java) | `backend/src/main/java/pl/lublin/dashboard/service/IkeService.java` |
+| Definicja eventu | `backend/.../event/ThreatUpdatedEvent.java` |
+| Logika IKE | `backend/.../agent/IkeAgent.java` + `docs/IKE_ALGORITHM.md` |
+| Import WFS | `backend/.../agent/FloodImportAgent.java` |
+| Rekomendacje | `backend/.../agent/DecisionAgent.java` |
+| Kontrakty API | `docs/API_REFERENCE.md` |
+| Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
+| Konfiguracja warstw | tabela `layer_config` — seed: `db/seed_layers.sql` |
+| Wagi IKE | `frontend/src/config/ike.config.json` |

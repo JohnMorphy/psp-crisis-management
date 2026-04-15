@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Projekt** | Inteligentna Mapa Województwa Lubelskiego |
-| **Wersja** | 1.2 |
+| **Wersja** | 1.3 |
 | **Status** | Draft |
 | **Data** | 2026-04-14 |
 | **Kontekst** | Urząd Marszałkowski Województwa Lubelskiego |
@@ -13,31 +13,28 @@
 
 ## 1. Cel produktu
 
-Zbudowanie interaktywnego, webowego dashboardu geospatialnego dla Marszałka Województwa
-Lubelskiego, który umożliwia podejmowanie decyzji opartych na danych w czasie rzeczywistym.
+Interaktywny, webowy dashboard geospatialny dla Marszałka Województwa Lubelskiego
+umożliwiający podejmowanie decyzji opartych na danych w czasie rzeczywistym.
 
-Moduł główny systemu: **zorganizowana, priorytetowa ewakuacja podopiecznych DPS-ów
+Moduł główny: **zorganizowana, priorytetowa ewakuacja podopiecznych DPS-ów
 i placówek opiekuńczych** w warunkach powodzi, pożaru lub blackoutu energetycznego.
 
 ### Problem
 
-Dane kluczowe dla decyzji kryzysowych (lokalizacja i pojemność DPS-ów, dostępność
-transportu, drożność dróg, zasięg zagrożenia) są rozproszone w kilkudziesięciu systemach
-instytucjonalnych. Marszałek nie dysponuje centralnym widokiem ani narzędziem korelowania
-tych informacji. W sytuacji kryzysowej ta fragmentacja bezpośrednio zagraża życiu osób
-zależnych.
+Dane kluczowe dla decyzji kryzysowych są rozproszone w kilkudziesięciu systemach.
+W sytuacji kryzysowej operator musi ręcznie zbierać informacje z wielu źródeł,
+korelować je i dopiero wtedy podjąć decyzję. Ta fragmentacja kosztuje czas — a czas
+w kryzysie bezpośrednio zagraża życiu osób zależnych.
 
 ### Mierzalne cele sukcesu
 
-Wyłącznie cele z bezpośrednim przełożeniem na wymagania implementacyjne:
-
 | KPI | Cel | Gdzie weryfikować |
 |---|---|---|
-| Czas ładowania mapy przy pierwszym otwarciu | < 3 s przy łączu 10 Mbps | Test wydajnościowy Lighthouse |
-| Czas odpowiedzi API (p95) | < 200 ms | Logi Spring Boot Actuator |
-| Czas aktualizacji warstw live | < 5 min od zmiany w źródle | Test integracyjny WebSocket |
-| Pokrycie placówek DPS w bazie | 100% DPS-ów województwa lubelskiego | Zapytanie `SELECT COUNT(*) FROM placowka` |
-| Zmiana filtra / warstwy w UI | < 500 ms do odświeżenia widoku mapy | Test manualny |
+| Czas ładowania mapy | < 3 s przy łączu 10 Mbps | Lighthouse |
+| Czas odpowiedzi API (p95) | < 200 ms | Spring Boot Actuator |
+| Czas od wyboru scenariusza do aktualizacji mapy | < 30 s | Test e2e (import WFS + IKE + WebSocket) |
+| Pokrycie placówek DPS w bazie | 100% DPS-ów województwa | `SELECT COUNT(*) FROM placowka` |
+| Zmiana warstwy / filtra w UI | < 500 ms | Test manualny |
 
 ---
 
@@ -47,16 +44,14 @@ Wyłącznie cele z bezpośrednim przełożeniem na wymagania implementacyjne:
 
 - Osoba decyzyjna, nie-programista
 - Pracuje na dużym monitorze lub tablecie w sali konferencyjnej
-- Potrzebuje odpowiedzi na pytania: *„Które placówki ewakuować najpierw? Czym? Dokąd?"*
-- Oczekuje danych widocznych na mapie bez klikania w spreadsheetach
-- Może wydawać polecenia głosowo podczas briefingu (ręce zajęte, stres)
+- Potrzebuje odpowiedzi: *„Które placówki ewakuować? Czym? Dokąd?"*
+- Oczekuje że wybranie scenariusza zagrożenia automatycznie uruchomi analizę
 
 ### 2.2 Persona pomocnicza — Koordynator Logistyczny
 
 - Obsługuje system operacyjnie podczas kryzysu
-- Nakłada i filtruje warstwy danych
-- Korzysta z kalkulatorów zasobów do szybkiego oszacowania potrzeb transportowych
-- Monitoruje social media pod kątem sygnałów z terenu
+- Nakłada i filtruje warstwy, korzysta z kalkulatorów zasobów
+- Weryfikuje i zatwierdza wygenerowane rekomendacje ewakuacyjne
 
 ---
 
@@ -64,294 +59,290 @@ Wyłącznie cele z bezpośrednim przełożeniem na wymagania implementacyjne:
 
 ### 3.1 W zakresie (in-scope)
 
-- Interaktywna mapa GIS województwa lubelskiego (podział na powiaty i gminy)
-- Wielowarstwowe nakładki danych dla modułu ewakuacji osób zależnych
-- Dynamiczne odświeżanie danych z timestampem ostatniej aktualizacji
-- Filtry geograficzne (powiat / gmina) i tematyczne (typ zagrożenia, typ placówki)
+- Interaktywna mapa GIS województwa lubelskiego (powiaty, gminy)
+- Wielowarstwowe nakładki danych
+- Dynamiczne odświeżanie danych (event-driven przez WebSocket)
+- Integracja danych geospatialnych z zewnętrznych źródeł (WFS / GeoJSON)
+- Automatyczne przeliczanie sytuacji kryzysowej (IKE) w reakcji na zmianę zagrożenia
+- Generowanie rekomendacji ewakuacyjnych przez DecisionAgent
+- Filtry geograficzne i tematyczne
 - Responsywne UI na duży monitor / tablet
-- Moduł integracji danych z publicznie dostępnych źródeł (web scraping)
 - Wbudowane kalkulatory zasobów
-- Agent social media (geolokalizacja sygnałów z terenu)
-- Asystent głosowy (sterowanie mapą bez klawiatury)
+- Asystent głosowy (sterowanie mapą)
 
 ### 3.2 Poza zakresem (out-of-scope)
 
-- Integracja z systemami operacyjnymi służb ratunkowych (np. SWD PSP)
+- Integracja z systemami operacyjnymi służb ratunkowych (SWD PSP)
 - Moduł autentykacji i zarządzania użytkownikami
 - Obsługa danych niejawnych / wrażliwych (RODO)
 - Wersja mobilna (smartfon)
+- Integracja z social media
 
 > Baza danych PostgreSQL + PostGIS jest fundamentem systemu i jest **w zakresie**.
-> Patrz `docs/ARCHITEKTURA_PLAN.md`.
 
 ---
 
-## 4. Wymagania funkcjonalne
+## 4. Model działania systemu (event-driven)
 
-### 4.1 Wymagania podstawowe (obowiązkowe)
+System działa reaktywnie — zmiana stanu zagrożenia automatycznie uruchamia
+łańcuch analiz bez interwencji operatora.
+
+### 4.1 Centralny event: `ThreatUpdatedEvent`
+
+```
+Użytkownik: wybiera scenariusz (np. powódź Q100 dla powiatu chełmskiego)
+    ↓
+FloodImportAgent:
+    1. pobiera dane z WFS (ISOK/RZGW) lub generuje syntetyczne (fallback)
+    2. konwertuje GML → GeoJSON, transformuje układ współrzędnych → EPSG:4326
+    3. zapisuje strefy do tabeli strefy_zagrozen
+    4. publishEvent(new ThreatUpdatedEvent(scenariusz, obszar, timestamp))
+    ↓ [HTTP odpowiada 202 Accepted — poniższe dzieje się asynchronicznie]
+    ↓
+    ├── IkeAgent (@Async @EventListener)
+    │       przelicza IKE dla wszystkich placówek
+    │       zapisuje wyniki do ike_results
+    │       publishEvent(IkeRecalculatedEvent)
+    │
+    ├── DecisionAgent (@Async @EventListener)
+    │       na podstawie IKE generuje rekomendacje ewakuacyjne
+    │       zapisuje do tabeli evacuation_decisions
+    │
+    └── LiveFeedService (@Async @EventListener)
+            pushuje przez WebSocket do wszystkich podłączonych klientów
+            frontend automatycznie odświeża mapę i panele
+```
+
+### 4.2 Scenariusze zagrożeń
+
+Użytkownik nie rysuje stref ręcznie. Wybiera gotowy scenariusz z listy:
+
+| Typ | Scenariusze | Źródło danych |
+|---|---|---|
+| Powódź | Q10, Q100, Q500 | WFS ISOK / RZGW (fallback: syntetyczny) |
+| Pożar | Mały / Średni / Duży (promieniowo od punktu) | Syntetyczny (parametryczny) |
+| Blackout | Powiat / Strefa (obszar administracyjny) | Syntetyczny (obszar z bazy) |
+
+### 4.3 Kiedy IKE się przelicza
+
+IKE przelicza się **wyłącznie** w reakcji na `ThreatUpdatedEvent`. Nie ma przycisku
+„Przelicz IKE" dostępnego wprost — endpoint `POST /api/ike/recalculate` istnieje
+wyłącznie na potrzeby administratora i wewnętrznie publikuje `ThreatUpdatedEvent`.
+
+---
+
+## 5. Wymagania funkcjonalne
+
+### 5.1 Wymagania podstawowe
 
 #### F-01 — Interaktywna mapa GIS
 
-- Mapa województwa lubelskiego z podziałem administracyjnym: powiaty i gminy
-  (213 gmin, 4 miasta na prawach powiatu)
-- Płynny zoom od widoku województwa do poziomu konkretnej miejscowości
-- Podkład mapowy OpenStreetMap
-- Podświetlenie i zaznaczenie aktywnego powiatu / gminy po kliknięciu
-- Wyświetlanie nazwy i podstawowych statystyk jednostki w panelu bocznym
+- Mapa województwa lubelskiego z podziałem: powiaty i gminy (213 gmin + 4 miasta)
+- Płynny zoom od widoku województwa do miejscowości
+- Podkład OpenStreetMap
+- Podświetlenie aktywnego powiatu / gminy po kliknięciu
+- Statystyki jednostki w panelu bocznym
 
-#### F-02 — Wielowarstwowe nakładki danych
+#### F-02 — Warstwy danych
 
-Użytkownik może niezależnie włączać, wyłączać i nakładać na siebie poniższe warstwy:
-
-| ID | Nazwa | Typ geometrii | Źródło danych |
+| ID | Nazwa | Typ | Źródło |
 |---|---|---|---|
 | L-01 | DPS i placówki opiekuńcze | Punkty | Tabela `placowka` |
-| L-02 | Liczba i poziom samodzielności podopiecznych | Heatmapa | Tabela `placowka` |
-| L-03 | Strefy zagrożenia (powódź / pożar / blackout) | Poligony | Tabela `strefy_zagrozen` |
+| L-02 | Gęstość podopiecznych | Heatmapa | Tabela `placowka` |
+| L-03 | Strefy zagrożenia | Poligony | Tabela `strefy_zagrozen` |
 | L-04 | Drożność dróg ewakuacyjnych | Linie | Tabela `drogi_ewakuacyjne` |
 | L-05 | Dostępność transportu | Punkty | Tabela `zasob_transportu` |
 | L-06 | Miejsca relokacji | Punkty | Tabela `miejsca_relokacji` |
-| L-07 | „Białe plamy" transportowe | Poligony | Tabela `biale_plamy` |
+| L-07 | Białe plamy transportowe | Poligony | Tabela `biale_plamy` |
 
-#### F-03 — Dynamiczne odświeżanie danych
+#### F-03 — Dynamiczne odświeżanie
 
-- Każda warstwa posiada widoczny znacznik czasu ostatniej aktualizacji
-- Możliwość manualnego odświeżenia warstwy jednym kliknięciem
-- Automatyczne odświeżanie co konfigurowalny interwał (domyślnie: 60 s dla warstw live,
-  15 min dla danych rzadko zmieniających się)
-- Wizualny wskaźnik stanu odświeżania (spinner / ikona statusu przy warstwie)
+- Warstwy odświeżają się automatycznie po otrzymaniu eventu przez WebSocket
+- Każda warstwa ma znacznik czasu ostatniej aktualizacji
+- Wizualny wskaźnik stanu odświeżania (spinner przy warstwie)
 
 #### F-04 — Filtry i selekcja regionu
 
-- Dropdown lub wyszukiwarka: filtrowanie widoku do wybranego powiatu lub gminy
-- Filtr typologiczny: typ placówki (DPS, dom dziecka, hostel wspomagany itp.)
-- Filtr poziomu zagrożenia: strefa czerwona / żółta / zielona
-- Filtr krytyczności ewakuacji: wyliczany automatycznie przez IKE (patrz F-05)
-- Możliwość łączenia filtrów (AND)
-- Przycisk „Reset filtrów"
+- Filtrowanie widoku do powiatu / gminy
+- Filtr: typ placówki, poziom zagrożenia IKE (czerwony / żółty / zielony)
+- Łączenie filtrów (AND), przycisk „Reset filtrów"
 
-#### F-05 — Priorytetyzacja ewakuacji (Indeks Krytyczności Ewakuacji — IKE)
+#### F-05 — IKE (Indeks Krytyczności Ewakuacji)
 
-Kluczowa logika analityczna systemu. Dla każdej placówki backend wyznacza
-**Indeks Krytyczności Ewakuacji (IKE)** — liczbę z zakresu [0.0–1.0].
+Szczegóły: `docs/IKE_ALGORITHM.md`.
 
-Szczegółowa formuła, wagi i edge case'y: `docs/IKE_ALGORITHM.md`.
+- Automatyczne przeliczanie po `ThreatUpdatedEvent`
+- Kolorowanie markerów: czerwony (≥0.70) / żółty (0.40–0.69) / zielony (<0.40)
+- Panel „Top 10 do ewakuacji"
+- Popup z danymi placówki + sugerowaną trasą + rekomendowanym miejscem relokacji
 
-- Placówki na mapie kolorowane wg IKE: czerwony (≥ 0.70) / żółty (0.40–0.69) / zielony (< 0.40)
-- Panel „Top 10 do ewakuacji" z listą priorytetową po boku mapy
-- Po kliknięciu placówki: popup z danymi szczegółowymi + sugerowaną trasą ewakuacji
-  + rekomendowanym miejscem relokacji
-- Wizualizacja trasy ewakuacji jako linia na mapie z informacją o czasie przejazdu
+#### F-06 — Panel scenariuszy (ScenarioPanel)
 
-#### F-06 — Responsywne UI
+- Lista dostępnych scenariuszy (powódź Q10/Q100/Q500, pożar, blackout)
+- Wybór obszaru: dropdown powiatu lub bbox na mapie
+- Przycisk „Aktywuj scenariusz" → wywołuje `POST /api/threat/flood/import`
+- Przycisk „Wyczyść zagrożenie" → wywołuje `POST /api/threat/clear`
+- Status importu: spinner podczas pobierania WFS, komunikat błędu gdy WFS niedostępny
 
-- Układ zoptymalizowany na rozdzielczość min. 1920×1080 i 1280×800 (tablet poziomo)
-- Panel boczny z kontrolkami warstw i filtrami, zwijany do ikony
-- Mapa zajmuje minimum 70% powierzchni ekranu
-- Elementy UI czytelne z odległości 1–2 m od ekranu (min. 14px font dla etykiet)
-- Obsługa dotyku (pinch-to-zoom, drag)
+#### F-07 — Panel rekomendacji (DecisionPanel)
+
+- Lista rekomendacji wygenerowanych przez DecisionAgent po ostatnim `ThreatUpdatedEvent`
+- Każda rekomendacja: placówka, akcja (ewakuuj / przygotuj / monitoruj),
+  priorytet, sugerowany cel relokacji
+- Możliwość zatwierdzenia / odrzucenia rekomendacji przez operatora
+
+#### F-08 — Responsywne UI
+
+- Min. 1920×1080 i 1280×800 (tablet poziomo)
+- Mapa min. 70% ekranu, panel boczny zwijany
+- Min. 14px font, obsługa dotyku
 
 ---
 
-### 4.2 Wymagania dodatkowe
+### 5.2 Wymagania dodatkowe
 
-#### F-10 — Integracja danych z publicznie dostępnych źródeł
-
-- Moduł automatycznie pobierający dane o placówkach i ich pojemności:
-  - Rejestr Jednostek Pomocy Społecznej (mpips.gov.pl) — HTML
-  - BIP urzędów powiatowych — HTML
-  - Pliki XLSX/CSV publikowane przez Lubelski Urząd Marszałkowski
-- Scraper uruchamiany manualnie (przycisk „Odśwież dane z urzędów") lub wg harmonogramu
-- Log ostatniego scrapingu z listą pobranych rekordów i błędami
-- Dane scrapowane zapisywane do bazy z adnotacją `zrodlo = 'scraping'`
-
-#### F-11 — Wbudowane kalkulatory zasobów
+#### F-10 — Kalkulatory zasobów
 
 **Kalkulator 1: Transport ewakuacyjny**
-- Dane wejściowe: wybrana placówka lub strefa, promień poszukiwania pojazdów
-- Wynik: szacowany czas ewakuacji, liczba kursów, lista sugerowanych pojazdów
+- Wejście: placówka, promień szukania pojazdów
+- Wynik: czas ewakuacji, liczba kursów, lista pojazdów
 
 **Kalkulator 2: Pojemność miejsc relokacji**
-- Dane wejściowe: liczba ewakuowanych, poziom niesamodzielności
-- Wynik: lista dostępnych miejsc relokacji z pojemnością i odległością,
-  % wypełnienia po przyjęciu ewakuowanych
+- Wejście: liczba ewakuowanych, poziom niesamodzielności
+- Wynik: lista miejsc z pojemnością i odległością, % wypełnienia
 
 **Kalkulator 3: Zasięg zagrożenia w czasie**
-- Dane wejściowe: typ zagrożenia, prędkość rozprzestrzeniania
+- Wejście: typ zagrożenia, prędkość rozprzestrzeniania
 - Wynik: szacowany czas do objęcia placówki zagrożeniem
 
-UI: panel wysuwalny od lewej strony mapy; wyniki widoczne też jako warstwa na mapie.
+#### F-11 — Scraper danych urzędowych
 
-#### F-12 — Agent social media
+- Pobieranie danych o placówkach z mpips.gov.pl i BIP powiatów
+- Zapis do bazy z `zrodlo = 'scraping'`
+- Log scrapingu z liczbą rekordów i błędami
 
-- Moduł analizujący posty zawierające geolokalizację lub nazwy miejscowości
-  województwa lubelskiego
-- Słowa kluczowe: powódź, pożar, blackout, ewakuacja, prąd, droga, zamknięte, pomoc
-- Geolokalizacja postów: ekstrakcja toponimu → geokodowanie (Nominatim)
-- Wyświetlanie jako pinezki na mapie z treścią i datą
-- Panel „Ostatnie sygnały" z listą chronologiczną
-- Dane demonstracyjne (seed w bazie) lub pobierane przez publiczne API
+#### F-12 — Asystent głosowy
 
-#### F-13 — Asystent głosowy
+- Aktywacja: przycisk lub klawisz Spacja
+- Obsługiwane komendy:
 
-- Aktywacja: przycisk mikrofonu lub skrót klawiaturowy (Spacja)
-- Obsługiwane komendy (język polski):
-
-| Komenda (przykład) | Akcja |
+| Komenda | Akcja |
 |---|---|
-| „Pokaż powiat lubelski" | Zoom do powiatu, podświetlenie |
-| „Włącz warstwę zagrożeń" | Aktywacja warstwy L-03 |
-| „Wyłącz transport" | Ukrycie warstwy L-05 |
-| „Które placówki są czerwone?" | Filtr IKE = krytyczny, lista w panelu |
-| „Pokaż trasę ewakuacji dla DPS Końskowola" | Wyświetlenie trasy na mapie |
-| „Odśwież dane" | Manualne odświeżenie wszystkich warstw |
-| „Ile miejsc relokacji w promieniu 30 km od Lublina?" | Uruchomienie kalkulatora |
+| „Pokaż powiat lubelski" | Zoom + podświetlenie powiatu |
+| „Włącz warstwę zagrożeń" | Toggle L-03 |
+| „Wyłącz transport" | Toggle L-05 |
+| „Aktywuj powódź Q100" | Uruchomienie scenariusza powodziowego |
+| „Które placówki są czerwone?" | Filtr IKE = czerwony |
+| „Pokaż trasę ewakuacji dla DPS Końskowola" | Trasa na mapie |
+| „Odśwież dane" | Manualne odświeżenie warstw |
 
-- Feedback wizualny: animacja fali dźwiękowej podczas nasłuchiwania, transkrypcja tekstu
-- Technologia: Web Speech API (przeglądarka), fallback: Whisper API (OpenAI)
-
----
-
-## 5. Wymagania niefunkcjonalne
-
-| ID | Wymaganie | Kryterium akceptacji |
-|---|---|---|
-| NF-01 | Wydajność ładowania mapy | Pierwsza mapa renderuje się < 3 s przy łączu 10 Mbps |
-| NF-02 | Responsywność UI | Zmiana warstwy / filtra odpowiada < 500 ms |
-| NF-03 | Przeglądarki | Chrome 120+, Edge 120+, Firefox 120+ |
-| NF-04 | Czytelność | Kontrast spełnia WCAG AA dla kluczowych elementów UI |
-| NF-05 | Skalowalność | Dodanie nowej warstwy GeoJSON wymaga zmiany tylko w tabeli `layer_config`, bez modyfikacji kodu |
-| NF-06 | Czas odpowiedzi API | p95 < 200 ms dla endpointów REST (mierzony przez Spring Boot Actuator) |
+- Technologia: Web Speech API + fallback Whisper API (OpenAI)
 
 ---
 
-## 6. Dane i źródła
+## 6. Wymagania niefunkcjonalne
 
-### 6.1 Dane rzeczywiste / publiczne
-
-| Dane | Źródło | Format |
+| ID | Wymaganie | Kryterium |
 |---|---|---|
-| Granice administracyjne gmin i powiatów | GUGiK / GADM 4.1 | GeoJSON |
-| Strefy zagrożenia powodziowego | ISOK / RZGW | GeoJSON / WMS |
-| Rejestr placówek pomocy społecznej | mpips.gov.pl | HTML / CSV |
-| Dane o drogach | OpenStreetMap (Overpass API) | GeoJSON |
-| Dane demograficzne gmin | GUS | CSV/XLSX |
-
-### 6.2 Dane seedowane do bazy
-
-Dane startowe ładowane przez skrypty seed przy inicjalizacji bazy.
-Nie są odczytywane z plików w runtime — żyją wyłącznie w PostgreSQL.
-
-| Dane | Plik seed | Liczba rekordów |
-|---|---|---|
-| Placówki DPS | `seed_dps.sql` | 48 (po 2 na każdy z 24 powiatów) |
-| Miejsca relokacji | `seed_relokacja.sql` | ~20 |
-| Zasoby transportowe | `seed_transport.sql` | ~30 |
-| Konfiguracja warstw | `seed_layers.sql` | 7 (L-01 … L-07) |
-| Strefy zagrożeń | `seed_strefy.sql` | ~10 (syntetyczne) |
-| Social media feed | `seed_social.sql` | ~25 (demonstracyjne) |
-
-Dane syntetyczne używają prawdziwych nazw miejscowości lubelskich
-i realistycznych wartości liczbowych.
+| NF-01 | Ładowanie mapy | < 3 s przy 10 Mbps |
+| NF-02 | Responsywność UI | < 500 ms na zmianę warstwy / filtra |
+| NF-03 | Czas od ThreatUpdatedEvent do aktualizacji mapy | < 30 s (import + IKE + WebSocket) |
+| NF-04 | Przeglądarki | Chrome 120+, Edge 120+, Firefox 120+ |
+| NF-05 | Czytelność | Kontrast WCAG AA |
+| NF-06 | Skalowalność | Nowa warstwa = INSERT do `layer_config`, zero zmian w kodzie |
+| NF-07 | Asynchroniczność | `@Async` na listenerach — request HTTP kończy się przed przetworzeniem eventu |
 
 ---
 
-## 7. Architektura techniczna
+## 7. Dane i źródła
 
-Szczegółowy opis w `docs/ARCHITEKTURA_PLAN.md`.
+### 7.1 Dane z zewnętrznych źródeł GIS
+
+| Dane | Źródło | Protokół | Fallback |
+|---|---|---|---|
+| Strefy zagrożenia powodziowego Q10/Q100/Q500 | ISOK / RZGW Hydroportal | WFS (GML) | Syntetyczny GeoJSON |
+| Granice administracyjne | GADM 4.1 / GUGiK | GeoJSON | Bounding box województwa |
+| Drogi ewakuacyjne | OpenStreetMap (Overpass API) | GeoJSON | Seed syntetyczny |
+
+### 7.2 Dane seedowane do bazy
+
+| Dane | Plik seed | Rekordy |
+|---|---|---|
+| Placówki DPS | `seed_dps.sql` | 48 (po 2 na powiat) |
+| Miejsca relokacji | `seed_relokacja.sql` | ~10 |
+| Zasoby transportowe | `seed_transport.sql` | ~10 |
+| Konfiguracja warstw | `seed_layers.sql` | 7 (L-01…L-07) |
+| Strefy zagrożeń (demo) | `seed_strefy.sql` | ~5 |
+
+---
+
+## 8. Architektura (skrót)
+
+Szczegóły: `docs/ARCHITEKTURA_PLAN.md`.
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                     Frontend                          │
-│  React 18  +  React-Leaflet                          │
-│  Tailwind CSS · Zustand · React Query                │
-│  Web Speech API · Recharts                            │
-└───────────────────────┬──────────────────────────────┘
-                        │ REST (JSON) / WebSocket (STOMP)
-┌───────────────────────▼──────────────────────────────┐
-│          Backend — Spring Boot 3 / OpenJDK 21         │
-│  GeoController · IkeService · KalkulatorService      │
-│  ScraperService · SocialMediaService · LiveFeedService│
-└───────────────────────┬──────────────────────────────┘
-                        │
-┌───────────────────────▼──────────────────────────────┐
-│          PostgreSQL 15 + PostGIS                      │
-│  Jedyne źródło danych runtime                        │
-│  Geometrie · Warstwy · IKE results · Cache           │
-└──────────────────────────────────────────────────────┘
+Frontend (React)
+    ↕ REST + WebSocket (STOMP)
+Backend (Spring Boot)
+    ├── Controllers  — HTTP endpoints
+    ├── Agents       — IkeAgent, DecisionAgent, FloodImportAgent
+    ├── Events       — ThreatUpdatedEvent, IkeRecalculatedEvent
+    └── Services     — GeoService, KalkulatorService, ScraperService
+    ↕
+PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 ```
-
-### Decyzje technologiczne
-
-| Warstwa | Technologia |
-|---|---|
-| Frontend | React 18 + Vite |
-| Mapy | React-Leaflet (jedyna biblioteka map) |
-| State management | Zustand |
-| Data fetching | TanStack Query (React Query) |
-| Backend | Spring Boot 3.x / OpenJDK 21 (LTS) |
-| Live feed | WebSocket + STOMP (Spring native) |
-| Baza danych | PostgreSQL 15 + PostGIS |
-| Scraping HTML | Jsoup |
-| Parsowanie XLSX | Apache POI |
-| Routing tras | OSRM public API |
-| Asystent głosowy | Web Speech API + fallback Whisper API (OpenAI) |
-| Deploy | Docker + docker-compose |
 
 ---
 
-## 8. User stories (MVP)
+## 9. User stories
 
 | ID | Jako… | Chcę… | Aby… |
 |---|---|---|---|
-| US-01 | Marszałek | zobaczyć mapę województwa z zaznaczonymi DPS-ami | wiedzieć, gdzie są placówki z osobami zależnymi |
-| US-02 | Marszałek | włączyć warstwę zagrożenia powodziowego | zobaczyć, które placówki są w strefie zagrożenia |
-| US-03 | Operator | kliknąć na placówkę | uzyskać dane o liczbie podopiecznych i rekomendowanej akcji |
-| US-04 | Marszałek | zobaczyć listę „Top 10 do ewakuacji" | natychmiast wiedzieć, od czego zacząć |
-| US-05 | Operator | uruchomić kalkulator transportu dla wybranego powiatu | szybko oszacować potrzeby pojazdów |
-| US-06 | Marszałek | wydać komendę głosową „Pokaż powiat zamojski" | manewrować mapą bez odrywania rąk |
-| US-07 | Operator | zobaczyć pinezki z social mediów | mieć sygnały z terenu poza oficjalnym kanałem |
-| US-08 | Operator | odświeżyć dane z urzędowych stron jednym kliknięciem | mieć aktualne dane bez ręcznego przeglądania stron |
-| US-09 | Operator | filtrować widok do wybranej gminy | skupić się na obszarze kryzysu |
-| US-10 | Marszałek | zobaczyć trasę ewakuacji z DPS do miejsca relokacji | podjąć decyzję o kierunku transportu |
+| US-01 | Marszałek | wybrać scenariusz „powódź Q100" dla powiatu chełmskiego | system automatycznie pobrał dane i pokazał zagrożone placówki |
+| US-02 | Marszałek | zobaczyć aktualizację mapy bez odświeżania strony | wiedzieć na bieżąco jak zmienia się sytuacja |
+| US-03 | Operator | zobaczyć listę „Top 10 do ewakuacji" | natychmiast wiedzieć od czego zacząć |
+| US-04 | Operator | kliknąć na placówkę | uzyskać dane o podopiecznych, IKE i rekomendowanej trasie |
+| US-05 | Operator | zobaczyć panel rekomendacji | mieć gotowe decyzje do zatwierdzenia |
+| US-06 | Operator | uruchomić kalkulator transportu | oszacować potrzeby pojazdów |
+| US-07 | Marszałek | wydać komendę głosową | manewrować mapą bez odrywania rąk |
+| US-08 | Operator | wyczyścić aktualne zagrożenie | zresetować system po zakończeniu kryzysu |
 
 ---
 
-## 9. Kryteria akceptacji (Definition of Done)
+## 10. Kryteria akceptacji (Definition of Done)
 
-- [ ] Mapa GIS ładuje się i wyświetla granice województwa z podziałem na powiaty i gminy
-- [ ] Co najmniej 5 warstw tematycznych jest funkcjonalnych (włącz/wyłącz/nakładaj)
-- [ ] Logika IKE wyznacza priorytety dla wszystkich placówek w bazie
-- [ ] Panel „Top 10 do ewakuacji" wyświetla posortowaną listę z trasami na mapie
-- [ ] Kalkulator transportu zwraca wynik dla wybranego obszaru
-- [ ] Kalkulator miejsc relokacji działa i wyświetla wynik na mapie
-- [ ] Scraper pobiera dane z co najmniej 1 publicznego źródła i aktualizuje bazę
-- [ ] Social media agent wyświetla pinezki z postami geolokalizowanymi
-- [ ] Asystent głosowy rozpoznaje co najmniej 7 komend z tabeli F-13
-- [ ] UI renderuje się poprawnie na 1920×1080 i 1280×800
-- [ ] Backend Spring Boot odpowiada na zapytania REST w < 200 ms (p95)
-- [ ] WebSocket dostarcza aktualizacje warstw live bez przeładowania strony
-- [ ] Kod źródłowy w repozytorium Git z dokumentacją uruchomienia
+- [ ] Wybór scenariusza zagrożenia uruchamia import danych i przeliczenie IKE
+- [ ] Frontend otrzymuje aktualizację przez WebSocket bez ręcznego odświeżania
+- [ ] IKE przelicza się automatycznie po `ThreatUpdatedEvent` — nie wymaga kliknięcia
+- [ ] DecisionAgent generuje rekomendacje widoczne w DecisionPanel
+- [ ] Panel „Top 10 do ewakuacji" wyświetla posortowaną listę z trasami
+- [ ] FloodImportAgent działa z WFS i z fallbackiem syntetycznym
+- [ ] `POST /api/threat/clear` czyści strefy i aktualizuje mapę
+- [ ] Kalkulatory transportu, relokacji i zasięgu zagrożenia działają
+- [ ] Scraper pobiera dane z ≥1 publicznego źródła
+- [ ] Asystent głosowy rozpoznaje 7 komend z tabeli F-12
+- [ ] UI działa na 1920×1080 i 1280×800
+- [ ] Backend odpowiada < 200 ms (p95)
 
 ---
 
-## 10. Plan iteracji
+## 11. Plan iteracji
 
 | Iteracja | Zakres |
 |---|---|
-| **v1.0 — Fundament GIS** | Mapa bazowa (React + React-Leaflet), warstwy L-01 i L-03, podział administracyjny, filtry geograficzne, Spring Boot z endpointami REST, PostgreSQL + PostGIS, seed 48 DPS-ów |
-| **v1.1 — Logika kryzysowa** | Pozostałe warstwy (L-02, L-04, L-05, L-06, L-07), logika IKE, panel „Top 10", wizualizacja tras ewakuacji (OSRM), WebSocket live feed |
-| **v1.2 — Moduły dodatkowe** | Scraper (Jsoup + Apache POI), 3 kalkulatory zasobów, zapytania PostGIS (`ST_DWithin`, `ST_Contains`) |
-| **v1.3 — AI & głos** | Agent social media (geocoding toponimów), asystent głosowy (Web Speech API + Whisper fallback), testy wydajnościowe, dokumentacja wdrożeniowa |
+| **v1.0 — Fundament GIS** | Mapa, granice, DPS-y, Spring Boot, PostGIS, seed 48 placówek, REST `/api/layers`, `/api/ike` |
+| **v1.1 — Event-driven core** | `ThreatUpdatedEvent`, `IkeAgent`, `DecisionAgent`, `LiveFeedService`, WebSocket, `ScenarioPanel`, `DecisionPanel` |
+| **v1.2 — Import i kalkulatory** | `FloodImportAgent` (WFS + fallback), `POST /api/threat/flood/import`, `POST /api/threat/clear`, 3 kalkulatory, Scraper |
+| **v1.3 — UX i głos** | Asystent głosowy (Web Speech API + Whisper), pełny docker-compose, testy wydajnościowe |
 
 ---
 
-## 11. Ryzyka
+## 12. Ryzyki
 
-| Ryzyko | Prawdopodobieństwo | Wpływ | Mitygacja |
-|---|---|---|---|
-| Brak GeoJSON granic gmin w dobrej jakości | Niskie | Wysokie | GADM 4.1 jako źródło + instrukcja w `docs/DATA_SCHEMA.md` |
-| Web Speech API niedokładne dla języka polskiego | Średnie | Średnie | Fallback Whisper API; tryb offline z predefiniowanymi przyciskami komend |
-| Social media API zablokowane / płatne | Wysokie | Niskie | Seed demonstracyjny w bazie; w produkcji integracja przez oficjalne API |
-| Publiczne strony urzędów zmieniają strukturę HTML | Średnie | Niskie | Selektory CSS w konfiguracji + cache ostatniego udanego pobrania w bazie |
-| Wydajność mapy przy wielu warstwach jednocześnie | Średnie | Średnie | MarkerCluster, lazy loading warstw, zapytania PostGIS z bounding box |
+| Ryzyko | Mitygacja |
+|---|---|
+| WFS ISOK niedostępny lub zmienia schemat | Syntetyczny fallback; cache ostatniego udanego importu w bazie |
+| Asynchroniczne `@Async` listenery — trudniejsze debugowanie | Szczegółowe logowanie eventów; ID korelacji w każdym evencie |
+| PostGIS zapytania wolne przy 48 placówkach × 5 stref | Indeksy GiST; cache wyników IKE w `ike_results`; batch processing |
+| Web Speech API nie działa w Firefox / bez HTTPS | Fallback Whisper API; przyciski predefiniowanych komend w UI |
+| GeoJSON granic niedostępny | GADM 4.1 jako źródło z instrukcją pobierania w `docs/DATA_SCHEMA.md` |

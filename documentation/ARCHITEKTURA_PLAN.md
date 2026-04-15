@@ -1,7 +1,6 @@
 # ARCHITEKTURA_PLAN.md — Inteligentna Mapa Województwa Lubelskiego
 
-> Dokument planistyczny — stack technologiczny, struktura katalogów, plan iteracji.
-> Wersja: 1.2 · Data: 2026-04-14
+> Wersja: 1.3 · Data: 2026-04-14
 
 ---
 
@@ -12,52 +11,52 @@
 | Warstwa | Technologia |
 |---|---|
 | Frontend framework | **React 18 + Vite** |
-| Mapa | **React-Leaflet** (jedyna biblioteka map — nie używaj MapLibre GL JS) |
+| Mapa | **React-Leaflet** (jedyna biblioteka map) |
 | State management | **Zustand** |
 | Data fetching | **TanStack Query (React Query)** |
 | Stylowanie | **Tailwind CSS** |
-| Wykresy / statystyki | **Recharts** |
-| Routing tras ewakuacji | **OSRM public API** (`https://router.project-osrm.org`) |
+| Wykresy | **Recharts** |
+| Routing tras ewakuacji | **OSRM public API** |
 | Asystent głosowy | **Web Speech API** + fallback Whisper API (OpenAI) |
 | Backend | **Spring Boot 3.x / OpenJDK 21 (LTS)** |
+| Eventy | **Spring ApplicationEventPublisher + `@Async`** |
 | Live feed | **WebSocket + STOMP** (Spring native + SockJS client) |
 | Scraping HTML | **Jsoup** |
 | Parsowanie XLSX | **Apache POI** |
+| Import GIS | **GeoTools** (GML→GeoJSON, transformacja EPSG) lub własny klient WFS |
 | Baza danych | **PostgreSQL 15 + PostGIS** |
-| Deploy | **Docker + docker-compose** (dwa tryby — patrz sekcja 2) |
+| Deploy | **Docker + docker-compose** (dwa tryby) |
 
 ### Kluczowe zasady projektowe
 
 1. **Database-first** — jedyne źródło danych runtime to PostgreSQL.
-   Pliki seed (`*.sql`, `*.json` w `src/data/`) służą wyłącznie do inicjalizacji bazy
-   i nie są odczytywane przez aplikację w trakcie działania.
+   Pliki seed (`*.sql`) służą wyłącznie do inicjalizacji bazy.
 
-2. **Config-driven layers** — każda warstwa GIS to jeden rekord w tabeli `layer_config`.
-   Dodanie nowej warstwy = wstawienie rekordu do bazy, zero zmian w kodzie.
+2. **Event-driven** — zmiana stanu zagrożenia publikuje `ThreatUpdatedEvent`.
+   Agenci reagują przez `@EventListener @Async`. Kontrolery nigdy nie wywołują
+   agentów bezpośrednio.
 
-3. **Separation of concerns** — logika IKE wyłącznie w `IkeService.java`;
-   frontend konsumuje gotowe wyniki przez REST.
+3. **Config-driven layers** — każda warstwa GIS to jeden rekord w `layer_config`.
+   Nowa warstwa = INSERT, zero zmian w kodzie.
 
-4. **PostGIS jako silnik geospatialny** — zapytania promieniowe (`ST_DWithin`),
-   nakładanie poligonów (`ST_Intersects`, `ST_Contains`) i indeksy GiST
-   realizowane w bazie, nie w aplikacji.
+4. **Separation of concerns** — każdy agent ma jedną odpowiedzialność:
+   `FloodImportAgent` importuje, `IkeAgent` liczy IKE, `DecisionAgent` decyduje.
 
-5. **Komponenty atomowe** — mapa, panel boczny, kalkulatory, social feed
-   i asystent głosowy to oddzielne moduły bez twardych zależności między sobą.
+5. **PostGIS jako silnik geospatialny** — `ST_DWithin`, `ST_Intersects`, `ST_Contains`
+   w bazie, nie w Javie ani JavaScript.
+
+6. **Komponenty atomowe** — mapa, panele, kalkulatory, asystent głosowy
+   to oddzielne moduły bez twardych zależności.
 
 ---
 
-## 2. Tryby uruchomienia (Docker)
+## 2. Tryby uruchomienia
 
-Projekt dostarcza dwa pliki docker-compose odpowiadające dwóm scenariuszom użycia.
+### `docker-compose.yml` — tryb dev
 
-### `docker-compose.yml` — tryb dev (codzienna praca)
-
-Uruchamia **tylko PostgreSQL + PostGIS**. Backend i frontend działają lokalnie
-(pełne debugowanie w IntelliJ, Vite HMR bez opóźnień).
+Tylko PostgreSQL + PostGIS. Backend i frontend działają lokalnie.
 
 ```yaml
-# docker-compose.yml
 services:
   postgres:
     image: postgis/postgis:15-3.4
@@ -75,24 +74,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
 volumes:
   postgres_data:
 ```
 
-Uruchomienie:
-```bash
-docker compose up -d postgres
-```
+### `docker-compose.full.yml` — tryb full-stack
 
-### `docker-compose.full.yml` — tryb full-stack (demo / onboarding / VPS)
-
-Uruchamia **cały stack**: baza + backend + frontend w kontenerach.
-Nie wymaga lokalnej instalacji Javy ani Node.js.
-Używany do szybkiego demo, onboardingu nowego developera i deploymentu na VPS.
+Cały stack w kontenerach. Demo, onboarding, VPS.
 
 ```yaml
-# docker-compose.full.yml
 services:
   postgres:
     image: postgis/postgis:15-3.4
@@ -138,75 +128,178 @@ volumes:
   postgres_data:
 ```
 
-Uruchomienie:
-```bash
-docker compose -f docker-compose.full.yml up --build
-```
-
 ---
 
 ## 3. Diagram architektury
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                     Frontend                          │
-│  React 18  +  React-Leaflet                          │
-│  Tailwind CSS · Zustand · React Query                │
-│  Web Speech API · Recharts                            │
-└───────────────────────┬──────────────────────────────┘
-                        │ REST (JSON) / WebSocket (STOMP)
-┌───────────────────────▼──────────────────────────────┐
-│          Backend — Spring Boot 3 / OpenJDK 21         │
-│                                                       │
-│  spring-web (REST Controllers)                        │
-│  spring-websocket + STOMP (live layer feeds)          │
-│  spring-scheduler (automatyczne odświeżanie)          │
-│                                                       │
-│  ├── GeoController      — serwowanie GeoJSON warstw   │
-│  ├── IkeService          — logika IKE                 │
-│  ├── KalkulatorService  — kalkulatory zasobów         │
-│  ├── ScraperService     — Jsoup + Apache POI          │
-│  └── SocialMediaService — agent social media          │
-└───────────────────────┬──────────────────────────────┘
-                        │
-┌───────────────────────▼──────────────────────────────┐
-│          PostgreSQL 15 + PostGIS                      │
-│                                                       │
-│  Jedyne źródło danych runtime.                       │
-│  Geometrie · Warstwy · IKE results · Cache            │
-│                                                       │
-│  Dane ładowane przez skrypty seed przy init.          │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                        Frontend                               │
+│  React 18 + React-Leaflet · Zustand · React Query            │
+│  ScenarioPanel · DecisionPanel · Top10Panel                  │
+│  Web Speech API · Recharts                                    │
+└───────────────────────────┬──────────────────────────────────┘
+                            │ REST (JSON) / WebSocket (STOMP)
+┌───────────────────────────▼──────────────────────────────────┐
+│                    Backend — Spring Boot 3                    │
+│                                                               │
+│  Controllers                                                  │
+│  ├── ThreatController   POST /api/threat/flood/import        │
+│  │                      POST /api/threat/clear               │
+│  ├── GeoController      GET  /api/layers/{id}                │
+│  ├── IkeController      GET  /api/ike                        │
+│  ├── DecisionController GET  /api/decisions                  │
+│  └── KalkulatorController POST /api/calculate/*              │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────┐     │
+│  │           Decision Layer (Agents)                    │     │
+│  │                                                      │     │
+│  │  FloodImportAgent ──publishes──► ThreatUpdatedEvent  │     │
+│  │                                         │            │     │
+│  │  IkeAgent ◄── @EventListener ───────────┤            │     │
+│  │  DecisionAgent ◄── @EventListener ──────┤            │     │
+│  │  LiveFeedService ◄── @EventListener ────┘            │     │
+│  └─────────────────────────────────────────────────────┘     │
+│                                                               │
+│  Services                                                     │
+│  ├── GeoService         ładowanie GeoJSON z plików i bazy    │
+│  ├── KalkulatorService  kalkulatory zasobów (PostGIS)        │
+│  └── ScraperService     Jsoup + Apache POI                   │
+└───────────────────────────┬──────────────────────────────────┘
+                            │
+┌───────────────────────────▼──────────────────────────────────┐
+│                PostgreSQL 15 + PostGIS                        │
+│  Jedyne źródło danych runtime.                               │
+│  placowka · strefy_zagrozen · ike_results                    │
+│  evacuation_decisions · layer_config · ...                   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Struktura katalogów
+## 4. Warstwa agentowa — szczegóły
+
+### 4.1 `ThreatUpdatedEvent`
+
+```java
+// backend/src/main/java/pl/lublin/dashboard/event/ThreatUpdatedEvent.java
+public class ThreatUpdatedEvent extends ApplicationEvent {
+    private final String scenariusz;   // "Q10" | "Q100" | "Q500" | "pozar" | "blackout"
+    private final String obszar;       // kod powiatu lub bbox "lon_min,lat_min,lon_max,lat_max"
+    private final String zrodlo;       // "wfs" | "syntetyczne"
+    private final Instant timestamp;
+    private final String correlationId; // UUID — do korelacji logów między agentami
+}
+```
+
+### 4.2 `FloodImportAgent`
+
+```
+Odpowiedzialność: import danych WFS → zapis do bazy → publikacja eventu
+
+Wyzwalacz: HTTP POST /api/threat/flood/import
+
+Algorytm:
+1. Pobierz GeoJSON z WFS ISOK/RZGW dla (obszar, scenariusz)
+   → jeśli WFS niedostępny (timeout/błąd) → użyj fallbacku syntetycznego, zloguj WARN
+2. Konwertuj GML → GeoJSON jeśli potrzeba
+3. Transformuj układ współrzędnych do EPSG:4326 jeśli inny
+4. Usuń istniejące strefy dla tego (obszar, scenariusz) z tabeli strefy_zagrozen
+5. Zapisz nowe strefy z zrodlo = 'wfs' lub 'syntetyczne'
+6. publisher.publishEvent(new ThreatUpdatedEvent(scenariusz, obszar, zrodlo, now(), UUID))
+```
+
+**WFS endpoint ISOK (docelowy):**
+```
+https://hydro.imgw.pl/model/gis/wfs?
+  service=WFS&version=1.0.0&request=GetFeature
+  &typeName=STREFAQ100    (lub Q10, Q500)
+  &bbox={bbox}
+  &srsName=EPSG:2180
+```
+
+**Fallback syntetyczny:**
+Generuj prostokąty wzdłuż koryt rzek na podstawie bounding boxa powiatu.
+Zapisuj z `zrodlo = 'syntetyczne'`. Dane syntetyczne wystarczają do demonstracji
+pełnego flow event-driven.
+
+### 4.3 `IkeAgent`
+
+```
+Odpowiedzialność: przeliczenie IKE dla wszystkich placówek po zmianie zagrożenia
+
+Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @Async
+
+Algorytm:
+1. Pobierz wszystkie placówki z tabeli placowka
+2. Dla każdej placówki oblicz IKE (szczegóły: docs/IKE_ALGORITHM.md)
+3. Upsert wyników do tabeli ike_results
+4. publisher.publishEvent(new IkeRecalculatedEvent(correlationId))
+
+Uwaga: @Async — działa w osobnym wątku, nie blokuje wątku HTTP.
+```
+
+### 4.4 `DecisionAgent`
+
+```
+Odpowiedzialność: generowanie rekomendacji ewakuacyjnych na podstawie IKE
+
+Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @Async
+
+Algorytm:
+1. Pobierz wyniki IKE z tabeli ike_results (mogą być jeszcze nieprzeliczone —
+   odczekaj na IkeRecalculatedEvent lub odpytuj z retry)
+2. Dla placówek z IKE >= 0.70: rekomendacja = 'ewakuuj_natychmiast'
+3. Dla IKE 0.40-0.69: rekomendacja = 'przygotuj_ewakuacje'
+4. Dla IKE < 0.40: rekomendacja = 'monitoruj'
+5. Zapisz do tabeli evacuation_decisions
+```
+
+**Uwaga implementacyjna:** `DecisionAgent` i `IkeAgent` oboje słuchają
+`ThreatUpdatedEvent` i działają asynchronicznie. `DecisionAgent` potrzebuje
+świeżych wyników IKE — może słuchać `IkeRecalculatedEvent` zamiast
+`ThreatUpdatedEvent`, żeby mieć gwarancję że IKE jest już przeliczone.
+
+### 4.5 `LiveFeedService`
+
+```
+Odpowiedzialność: push aktualizacji przez WebSocket do frontendu
+
+Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @EventListener(IkeRecalculatedEvent)
+
+Działanie:
+- Po ThreatUpdatedEvent: push do /topic/layers/L-03 (nowe strefy zagrożeń)
+- Po IkeRecalculatedEvent: push do /topic/ike (nowe wyniki IKE)
+- Payload: pełny GeoJSON warstwy lub lista IkeResult DTO
+```
+
+---
+
+## 5. Struktura katalogów
 
 ```
 gis-dashboard/
 │
 ├── CLAUDE.md
-├── docker-compose.yml              # tryb dev: tylko postgres
-├── docker-compose.full.yml         # tryb full-stack: postgres + backend + frontend
+├── docker-compose.yml
+├── docker-compose.full.yml
 ├── .env.example
 ├── .gitignore
 │
 ├── frontend/
 │   ├── package.json
 │   ├── vite.config.js
-│   ├── index.html
 │   ├── tailwind.config.js
-│   ├── Dockerfile                  # używany przez docker-compose.full.yml
-│   ├── nginx.conf                  # konfiguracja Nginx dla kontenera frontend
+│   ├── Dockerfile
+│   ├── nginx.conf
 │   │
 │   └── src/
 │       ├── main.jsx
 │       ├── App.jsx
 │       │
 │       ├── config/
-│       │   ├── layers.config.json  # konfiguracja warstw (wczytywana przez backend)
-│       │   └── ike.config.json     # wagi IKE (wczytywane przez IkeService)
+│       │   ├── layers.config.json      # konfiguracja warstw (fallback offline)
+│       │   └── ike.config.json         # wagi IKE
 │       │
 │       ├── components/
 │       │   ├── layout/
@@ -230,15 +323,15 @@ gis-dashboard/
 │       │   │   │   └── BialePlamiLayer.jsx
 │       │   │   └── popups/
 │       │   │       ├── DPSPopup.jsx
-│       │   │       ├── TransportPopup.jsx
-│       │   │       └── SocialMediaPin.jsx
+│       │   │       └── TransportPopup.jsx
 │       │   │
 │       │   ├── panels/
+│       │   │   ├── ScenarioPanel.jsx       # ★ wybór scenariusza zagrożenia
+│       │   │   ├── DecisionPanel.jsx       # ★ rekomendacje DecisionAgent
 │       │   │   ├── LayerControlPanel.jsx
 │       │   │   ├── FilterPanel.jsx
 │       │   │   ├── Top10Panel.jsx
-│       │   │   ├── RegionInfoPanel.jsx
-│       │   │   └── SocialMediaPanel.jsx
+│       │   │   └── RegionInfoPanel.jsx
 │       │   │
 │       │   ├── calculators/
 │       │   │   ├── CalculatorHub.jsx
@@ -262,8 +355,7 @@ gis-dashboard/
 │       │   ├── useLayerData.js
 │       │   ├── useWebSocket.js
 │       │   ├── useFilters.js
-│       │   ├── useVoiceCommands.js
-│       │   └── useSocialMediaFeed.js
+│       │   └── useVoiceCommands.js
 │       │
 │       ├── services/
 │       │   ├── api.js
@@ -278,49 +370,63 @@ gis-dashboard/
 │
 ├── backend/
 │   ├── pom.xml
-│   ├── Dockerfile                  # używany przez docker-compose.full.yml
+│   ├── Dockerfile
 │   │
 │   └── src/main/
 │       ├── java/pl/lublin/dashboard/
 │       │   ├── DashboardApplication.java
 │       │   │
+│       │   ├── event/
+│       │   │   ├── ThreatUpdatedEvent.java      # ★ centralny event
+│       │   │   └── IkeRecalculatedEvent.java    # ★ event po przeliczeniu IKE
+│       │   │
+│       │   ├── agent/                           # ★ warstwa agentowa
+│       │   │   ├── FloodImportAgent.java        # import WFS → publikacja ThreatUpdatedEvent
+│       │   │   ├── IkeAgent.java               # @EventListener → obliczanie IKE
+│       │   │   └── DecisionAgent.java          # @EventListener → rekomendacje
+│       │   │
 │       │   ├── config/
+│       │   │   ├── AsyncConfig.java            # ★ konfiguracja @Async (pula wątków)
 │       │   │   ├── WebSocketConfig.java
-│       │   │   ├── SchedulerConfig.java
 │       │   │   ├── CorsConfig.java
 │       │   │   └── DataSourceConfig.java
 │       │   │
 │       │   ├── controller/
+│       │   │   ├── ThreatController.java       # ★ POST /api/threat/*
 │       │   │   ├── GeoController.java
 │       │   │   ├── LayerConfigController.java
 │       │   │   ├── IkeController.java
+│       │   │   ├── DecisionController.java     # ★ GET /api/decisions
 │       │   │   ├── KalkulatorController.java
-│       │   │   ├── ScraperController.java
-│       │   │   └── SocialMediaController.java
+│       │   │   └── ScraperController.java
 │       │   │
 │       │   ├── service/
 │       │   │   ├── GeoService.java
-│       │   │   ├── IkeService.java
+│       │   │   ├── LiveFeedService.java        # @EventListener → WebSocket push
 │       │   │   ├── KalkulatorService.java
 │       │   │   ├── ScraperService.java
 │       │   │   ├── JsoupScraperService.java
 │       │   │   ├── XlsxParserService.java
-│       │   │   ├── SocialMediaService.java
-│       │   │   ├── GeocodingService.java
-│       │   │   └── LiveFeedService.java
+│       │   │   ├── WfsClientService.java       # ★ klient WFS (GML→GeoJSON, EPSG)
+│       │   │   └── GeocodingService.java
 │       │   │
 │       │   ├── repository/
 │       │   │   ├── PlacowkaRepository.java
+│       │   │   ├── StrefaZagrozenRepository.java
+│       │   │   ├── IkeResultRepository.java
+│       │   │   ├── EvacuationDecisionRepository.java
 │       │   │   ├── LayerConfigRepository.java
 │       │   │   ├── RelokacjaRepository.java
 │       │   │   └── TransportRepository.java
 │       │   │
 │       │   ├── model/
 │       │   │   ├── Placowka.java
+│       │   │   ├── StrefaZagrozen.java
+│       │   │   ├── IkeResult.java
+│       │   │   ├── EvacuationDecision.java     # ★ rekomendacja ewakuacyjna
 │       │   │   ├── MiejsceRelokacji.java
 │       │   │   ├── ZasobTransportu.java
-│       │   │   ├── LayerConfig.java
-│       │   │   └── IkeResult.java
+│       │   │   └── LayerConfig.java
 │       │   │
 │       │   └── scheduler/
 │       │       ├── LayerRefreshScheduler.java
@@ -330,18 +436,21 @@ gis-dashboard/
 │           ├── application.yml
 │           ├── application-dev.yml
 │           ├── application-prod.yml
+│           ├── geojson/
+│           │   ├── lublin_powiaty.geojson
+│           │   ├── lublin_gminy.geojson
+│           │   └── README.md               # instrukcja pobrania z GADM 4.1
 │           └── db/
-│               ├── schema.sql          # DDL: tabele + rozszerzenie PostGIS
-│               ├── seed_layers.sql     # konfiguracja 7 warstw GIS
-│               ├── seed_dps.sql        # 48 placówek DPS (po 2 na powiat)
-│               ├── seed_relokacja.sql  # miejsca relokacji
-│               ├── seed_transport.sql  # zasoby transportowe
-│               ├── seed_strefy.sql     # strefy zagrożeń (syntetyczne)
-│               └── seed_social.sql     # feed social media (demonstracyjny)
+│               ├── schema.sql
+│               ├── seed_layers.sql
+│               ├── seed_dps.sql
+│               ├── seed_relokacja.sql
+│               ├── seed_transport.sql
+│               └── seed_strefy.sql
 │
 └── docs/
     ├── PRD.md
-    ├── ARCHITEKTURA_PLAN.md    ← ten plik
+    ├── ARCHITEKTURA_PLAN.md
     ├── DATA_SCHEMA.md
     ├── IKE_ALGORITHM.md
     ├── API_REFERENCE.md
@@ -350,220 +459,196 @@ gis-dashboard/
 
 ---
 
-## 5. Schemat danych kluczowych
+## 6. Konfiguracja `@Async`
 
-Pełne DDL z wszystkimi tabelami i walidacjami: `docs/DATA_SCHEMA.md` sekcja 8.
+`AsyncConfig.java` musi definiować pulę wątków dla agentów:
 
-### Tabela `placowka` (fragment)
-
-```sql
-CREATE TABLE placowka (
-    id                       SERIAL PRIMARY KEY,
-    kod                      VARCHAR(20) UNIQUE NOT NULL,
-    nazwa                    VARCHAR(255) NOT NULL,
-    typ                      VARCHAR(30),
-    powiat                   VARCHAR(100) NOT NULL,
-    gmina                    VARCHAR(100) NOT NULL,
-    geom                     GEOMETRY(Point, 4326) NOT NULL,
-    pojemnosc_ogolna         INTEGER,
-    liczba_podopiecznych     INTEGER,
-    niesamodzielni_procent   DECIMAL(4,3),
-    generator_backup         BOOLEAN DEFAULT FALSE,
-    personel_dyzurny         INTEGER,
-    kontakt                  VARCHAR(50),
-    ostatnia_aktualizacja    TIMESTAMPTZ DEFAULT NOW(),
-    zrodlo                   VARCHAR(20) DEFAULT 'syntetyczne'
-);
-CREATE INDEX idx_placowka_geom ON placowka USING GIST(geom);
-```
-
-### `ike.config.json` — schemat wag
-
-Plik wczytywany przez `IkeService.java` przy starcie (`@PostConstruct`).
-
-```json
-{
-  "wagi": {
-    "zagrozenie": 0.35,
-    "niesamodzielni": 0.25,
-    "transport_brak": 0.20,
-    "droznosc_brak": 0.15,
-    "odleglosc_relokacji": 0.05
-  },
-  "progi": { "czerwony": 0.70, "zolty": 0.40 },
-  "promienie_km": { "transport_dostepny": 15, "miejsca_relokacji": 50 }
+```java
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+    @Bean(name = "agentTaskExecutor")
+    public TaskExecutor agentTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);      // IkeAgent, DecisionAgent, LiveFeedService
+        executor.setMaxPoolSize(6);
+        executor.setQueueCapacity(25);
+        executor.setThreadNamePrefix("agent-");
+        executor.initialize();
+        return executor;
+    }
 }
 ```
 
----
-
-## 6. Algorytm IKE
-
-Formuła, wagi, edge case'y i przykłady obliczeń: `docs/IKE_ALGORITHM.md`.
-
+Każdy listener używa tej puli:
+```java
+@Async("agentTaskExecutor")
+@EventListener
+public void onThreatUpdated(ThreatUpdatedEvent event) { ... }
 ```
-IKE = 0.35 × score_zagrozenia
-    + 0.25 × score_niesamodzielnych
-    + 0.20 × score_braku_transportu
-    + 0.15 × score_braku_droznosci
-    + 0.05 × score_odleglosci_relokacji
-```
-
-IKE ∈ [0, 1]:
-- **≥ 0.70** → czerwony (ewakuacja natychmiastowa)
-- **0.40–0.69** → żółty (przygotowanie)
-- **< 0.40** → zielony (brak bezpośredniego zagrożenia)
 
 ---
 
-## 7. Integracje zewnętrzne
+## 7. Schemat danych (fragment)
+
+Pełne DDL: `docs/DATA_SCHEMA.md`.
+
+### Nowa tabela: `evacuation_decisions`
+
+```sql
+CREATE TABLE evacuation_decisions (
+    id                   SERIAL PRIMARY KEY,
+    placowka_kod         VARCHAR(20) REFERENCES placowka(kod),
+    ike_score            DECIMAL(5,4),
+    rekomendacja         VARCHAR(30) CHECK (rekomendacja IN (
+                           'ewakuuj_natychmiast', 'przygotuj_ewakuacje', 'monitoruj'
+                         )),
+    cel_relokacji_kod    VARCHAR(20) REFERENCES miejsca_relokacji(kod),
+    uzasadnienie         TEXT,
+    zatwierdzona         BOOLEAN DEFAULT NULL,   -- NULL=oczekuje, TRUE=zatwierdzona, FALSE=odrzucona
+    correlation_id       VARCHAR(36),            -- UUID z ThreatUpdatedEvent
+    wygenerowano_o       TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_decisions_placowka ON evacuation_decisions(placowka_kod);
+CREATE INDEX idx_decisions_correlation ON evacuation_decisions(correlation_id);
+```
+
+### Zmiana w tabeli `strefy_zagrozen`
+
+```sql
+ALTER TABLE strefy_zagrozen
+    ADD COLUMN IF NOT EXISTS scenariusz VARCHAR(10),  -- 'Q10' | 'Q100' | 'Q500' | 'pozar_maly' itp.
+    ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(36);
+```
+
+---
+
+## 8. Integracje zewnętrzne
 
 | Serwis | Cel | Klucz API |
 |---|---|---|
 | OpenStreetMap / Leaflet | Podkład mapowy | Brak |
-| Nominatim (OSM) | Geokodowanie adresów i toponimów | Brak |
-| OSRM (public) | Wyznaczanie tras ewakuacji | Brak |
-| GUGiK / GADM 4.1 | GeoJSON granic administracyjnych | Brak (open data) |
-| Web Speech API | Asystent głosowy (przeglądarka) | Brak |
-| Whisper API (OpenAI) | Fallback asystenta głosowego | `OPENAI_API_KEY` |
-| mpips.gov.pl | Rejestr placówek pomocy społecznej | Brak (scraping HTML) |
+| Nominatim (OSM) | Geokodowanie | Brak |
+| OSRM (public) | Trasy ewakuacji | Brak |
+| GADM 4.1 / GUGiK | GeoJSON granic | Brak (open data) |
+| ISOK / RZGW Hydroportal | WFS dane powodziowe | Brak (publiczny WFS) |
+| Web Speech API | Asystent głosowy | Brak |
+| Whisper API (OpenAI) | Fallback głosowy | `OPENAI_API_KEY` |
+| mpips.gov.pl | Rejestr placówek | Brak (scraping) |
 
 ---
 
-## 8. Kolejność implementacji
+## 9. Kolejność implementacji
 
 ### ITERACJA v1.0 — Fundament GIS
 
-> Cel: działająca mapa z DPS-ami i granicami województwa, Spring Boot serwujący dane
-> z PostgreSQL przez REST.
+> Cel: działająca mapa z DPS-ami, Spring Boot serwuje dane z PostgreSQL przez REST.
 
 | Krok | Plik / zadanie | Opis |
 |---|---|---|
-| 1.1 | `docker-compose.yml` | PostgreSQL + PostGIS w kontenerze, profil dev |
-| 1.2 | `db/schema.sql` | DDL: tabele + rozszerzenie PostGIS |
+| 1.1 | `docker-compose.yml` | PostgreSQL + PostGIS w kontenerze |
+| 1.2 | `db/schema.sql` | DDL: wszystkie tabele + PostGIS |
 | 1.3 | `DashboardApplication.java` + `pom.xml` | Setup Spring Boot 3, zależności Maven |
-| 1.4 | `DataSourceConfig.java` + `application-dev.yml` | Konfiguracja połączenia z PostgreSQL |
-| 1.5 | `CorsConfig.java` | CORS dla frontendu (localhost:5173 + domena docelowa) |
-| 1.6 | `db/seed_layers.sql` | Seed konfiguracji 7 warstw GIS |
-| 1.7 | `db/seed_dps.sql` | Seed 48 placówek DPS |
-| 1.8 | Pliki GeoJSON granic | Pobranie z GADM 4.1, zapis do `backend/src/main/resources/geojson/` |
-| 1.9 | `db/seed_strefy.sql` | Seed syntetycznych stref zagrożenia |
-| 1.10 | `Placowka.java` + `PlacowkaRepository.java` | Encja JPA + repository |
-| 1.11 | `LayerConfig.java` + `LayerConfigRepository.java` | Encja JPA + repository |
-| 1.12 | `GeoService.java` | Ładowanie GeoJSON z plików i danych z bazy |
-| 1.13 | `GeoController.java` + `LayerConfigController.java` | REST: `GET /api/layers` i `GET /api/layers/{id}` |
-| 1.14 | `frontend/package.json` + `vite.config.js` | Setup Vite + React 18 + Tailwind |
-| 1.15 | `services/api.js` | Klient axios — base URL z `VITE_API_BASE_URL` |
-| 1.16 | `components/layout/AppShell.jsx` | Layout 70/30 (mapa / panel boczny) |
-| 1.17 | `components/layout/Header.jsx` | Nagłówek z tytułem i statusem systemu |
-| 1.18 | `components/map/MapContainer.jsx` | Leaflet z podkładem OSM, viewport na Lublin |
-| 1.19 | `components/map/AdminBoundaries.jsx` | GeoJSON powiatów i gmin z hover/click |
-| 1.20 | `components/map/layers/DPSLayer.jsx` | Markery DPS-ów z kolorowaniem wg IKE |
-| 1.21 | `components/map/popups/DPSPopup.jsx` | Popup z danymi placówki |
-| 1.22 | `components/panels/RegionInfoPanel.jsx` | Panel z info o klikniętym powiecie/gminie |
-| 1.23 | `components/map/layers/ZagrozeniaLayer.jsx` | Warstwa stref zagrożenia (poligony) |
+| 1.4 | `DataSourceConfig.java` + `application-dev.yml` | Połączenie z PostgreSQL |
+| 1.5 | `CorsConfig.java` | CORS dla frontendu |
+| 1.6 | `db/seed_layers.sql` + `db/seed_dps.sql` | Seed 7 warstw + 48 DPS-ów |
+| 1.7 | Pliki GeoJSON granic | Pobieranie z GADM 4.1 → `resources/geojson/` |
+| 1.8 | `db/seed_strefy.sql` | Seed syntetycznych stref zagrożenia |
+| 1.9 | Encje JPA + repozytoria | `Placowka`, `LayerConfig`, `StrefaZagrozen` |
+| 1.10 | `GeoService.java` | Ładowanie GeoJSON z plików i bazy |
+| 1.11 | `GeoController.java` + `LayerConfigController.java` | `GET /api/layers`, `GET /api/layers/{id}` |
+| 1.12 | `IkeAgent.java` (wersja uproszczona) | Obliczanie IKE bez eventów (na żądanie) |
+| 1.13 | `IkeController.java` | `GET /api/ike`, `GET /api/ike/{kod}` |
+| 1.14 | Vite + React 18 + Tailwind | Setup frontend |
+| 1.15 | `services/api.js` | Klient axios |
+| 1.16 | `AppShell.jsx` + `Header.jsx` | Layout 70/30 |
+| 1.17 | `MapContainer.jsx` | Leaflet, viewport na Lublin |
+| 1.18 | `AdminBoundaries.jsx` | GeoJSON powiatów i gmin |
+| 1.19 | `DPSLayer.jsx` + `DPSPopup.jsx` | Markery DPS-ów z IKE |
+| 1.20 | `ZagrozeniaLayer.jsx` | Strefy zagrożeń (poligony) |
+| 1.21 | `RegionInfoPanel.jsx` + `LayerControlPanel.jsx` | Panele boczne |
 
-**Deliverable v1.0:** Działająca mapa z DPS-ami, granicami i strefami zagrożeń.
-Spring Boot serwuje dane przez REST z PostgreSQL.
+**Deliverable v1.0:** Mapa z DPS-ami i strefami. IKE liczone na żądanie przez REST.
 
 ---
 
-### ITERACJA v1.1 — Logika kryzysowa
+### ITERACJA v1.1 — Event-driven core
 
-> Cel: kompletne 7 warstw, algorytm IKE, panel Top 10, trasy ewakuacji, WebSocket.
+> Cel: pełny flow event-driven — wybór scenariusza → event → IKE → rekomendacje → WebSocket.
 
 | Krok | Plik / zadanie | Opis |
 |---|---|---|
-| 2.1 | `db/seed_relokacja.sql` + `db/seed_transport.sql` | Seed miejsc relokacji i transportu |
-| 2.2 | `MiejsceRelokacji.java` + `ZasobTransportu.java` | Encje JPA + repozytoria |
-| 2.3 | `IkeService.java` | Algorytm IKE — zapytania PostGIS + ranking |
-| 2.4 | `IkeResult.java` | DTO wyniku IKE |
-| 2.5 | `IkeController.java` | REST: `GET /api/ike`, `GET /api/ike/{kod}`, `POST /api/ike/recalculate` |
-| 2.6 | `components/map/layers/HeatmapLayer.jsx` | Warstwa L-02 |
-| 2.7 | `components/map/layers/DrogiLayer.jsx` | Warstwa L-04 |
-| 2.8 | `components/map/layers/TransportLayer.jsx` | Warstwa L-05 |
-| 2.9 | `components/map/layers/RelokacjaLayer.jsx` | Warstwa L-06 |
-| 2.10 | `components/map/layers/BialePlamiLayer.jsx` | Warstwa L-07 |
-| 2.11 | `components/map/LayerManager.jsx` | Logika włączania/wyłączania warstw (Zustand) |
-| 2.12 | `components/panels/LayerControlPanel.jsx` | UI przełączników warstw z timestampami |
-| 2.13 | `components/panels/FilterPanel.jsx` | Filtry regionu, typu, zagrożenia, IKE |
-| 2.14 | `hooks/useFilters.js` | Stan filtrów w Zustand |
-| 2.15 | `utils/colorScale.js` | Mapowanie IKE → kolor markera |
-| 2.16 | `components/ui/IKEScore.jsx` | Wizualizacja IKE (kolor, liczba, label) |
-| 2.17 | `components/panels/Top10Panel.jsx` | Panel „Top 10 do ewakuacji" |
-| 2.18 | `services/routingService.js` | Integracja z OSRM |
-| 2.19 | `components/map/EvacuationRoute.jsx` | Rysowanie trasy na mapie |
-| 2.20 | `WebSocketConfig.java` | Konfiguracja STOMP + SockJS |
-| 2.21 | `LiveFeedService.java` | Publikowanie aktualizacji przez WebSocket |
-| 2.22 | `LayerRefreshScheduler.java` | Cykliczne odświeżanie warstw |
-| 2.23 | `services/websocketService.js` | SockJS + STOMP client (React) |
-| 2.24 | `hooks/useWebSocket.js` | Hook subskrypcji live feed |
-| 2.25 | `components/ui/StatusIndicator.jsx` | Spinner / ikona statusu przy warstwie |
-| 2.26 | `components/map/MapControls.jsx` | Zoom, reset widoku, fullscreen |
+| 2.1 | `ThreatUpdatedEvent.java` + `IkeRecalculatedEvent.java` | Klasy eventów |
+| 2.2 | `AsyncConfig.java` | Pula wątków dla agentów (`@EnableAsync`) |
+| 2.3 | `IkeAgent.java` (refaktor) | Zmiana z serwisu na `@EventListener @Async` |
+| 2.4 | `DecisionAgent.java` | `@EventListener(IkeRecalculatedEvent)` → rekomendacje |
+| 2.5 | `EvacuationDecision.java` + `EvacuationDecisionRepository.java` | Encja + repozytorium |
+| 2.6 | `FloodImportAgent.java` (stub) | Przyjmuje request, generuje syntetyczne strefy, publikuje event |
+| 2.7 | `ThreatController.java` | `POST /api/threat/flood/import`, `POST /api/threat/clear` |
+| 2.8 | `WebSocketConfig.java` | STOMP + SockJS |
+| 2.9 | `LiveFeedService.java` | `@EventListener` → push przez WebSocket |
+| 2.10 | `DecisionController.java` | `GET /api/decisions` |
+| 2.11 | `services/websocketService.js` + `hooks/useWebSocket.js` | WebSocket client React |
+| 2.12 | `components/panels/ScenarioPanel.jsx` | UI wyboru scenariusza |
+| 2.13 | `components/panels/DecisionPanel.jsx` | UI rekomendacji |
+| 2.14 | `Top10Panel.jsx` + `FilterPanel.jsx` | Panele z IKE |
+| 2.15 | Pozostałe warstwy L-02, L-04…L-07 | Komponenty React + dane seed |
+| 2.16 | `utils/colorScale.js` + `IKEScore.jsx` | Kolorowanie wg IKE |
+| 2.17 | `EvacuationRoute.jsx` + `routingService.js` | Trasy OSRM |
 
-**Deliverable v1.1:** Kompletne 7 warstw, IKE z rankingiem Top 10,
-trasy ewakuacji, live feed przez WebSocket.
+**Deliverable v1.1:** Pełny flow event-driven. Wybór scenariusza uruchamia
+automatyczne przeliczenie IKE i rekomendacje widoczne w UI przez WebSocket.
 
 ---
 
-### ITERACJA v1.2 — Moduły dodatkowe
+### ITERACJA v1.2 — Import WFS i kalkulatory
 
-> Cel: scraper danych z urzędów, 3 kalkulatory zasobów, zapytania PostGIS.
+> Cel: prawdziwy import z WFS ISOK z fallbackiem syntetycznym, 3 kalkulatory, scraper.
 
 | Krok | Plik / zadanie | Opis |
 |---|---|---|
-| 3.1 | `JsoupScraperService.java` | Scraper HTML (mpips.gov.pl, BIP powiatów) |
-| 3.2 | `XlsxParserService.java` | Parser XLSX (Apache POI) |
-| 3.3 | `GeocodingService.java` | Geokodowanie adresów (Nominatim) |
-| 3.4 | `ScraperService.java` | Orchestrator: Jsoup + POI + Geocoding → PostgreSQL |
-| 3.5 | `ScraperController.java` | REST: `POST /api/scraper/run`, `GET /api/scraper/log` |
-| 3.6 | `ScraperScheduler.java` | Harmonogram automatyczny (co 24h) |
-| 3.7 | `KalkulatorService.java` | Logika kalkulatorów (`ST_DWithin` w PostGIS) |
-| 3.8 | `KalkulatorController.java` | REST: `POST /api/calculate/transport`, `relocation`, `threat` |
-| 3.9 | `components/calculators/TransportCalculator.jsx` | Kalkulator transportu ewakuacyjnego |
-| 3.10 | `components/calculators/RelocationCalculator.jsx` | Kalkulator miejsc relokacji |
-| 3.11 | `components/calculators/ThreatSpreadCalculator.jsx` | Kalkulator zasięgu zagrożenia |
-| 3.12 | `components/calculators/CalculatorHub.jsx` | Drawer z wyborem kalkulatora |
-| 3.13 | `hooks/useLayerData.js` | Hook React Query — pobieranie + cache + auto-refresh |
+| 3.1 | `WfsClientService.java` | Klient HTTP dla WFS ISOK (GML→GeoJSON, EPSG:2180→4326) |
+| 3.2 | `FloodImportAgent.java` (pełny) | Prawdziwy WFS + fallback syntetyczny |
+| 3.3 | `KalkulatorService.java` | Logika kalkulatorów z `ST_DWithin` |
+| 3.4 | `KalkulatorController.java` | `POST /api/calculate/transport`, `relocation`, `threat` |
+| 3.5 | `TransportCalculator.jsx` | UI kalkulator 1 |
+| 3.6 | `RelocationCalculator.jsx` | UI kalkulator 2 |
+| 3.7 | `ThreatSpreadCalculator.jsx` | UI kalkulator 3 |
+| 3.8 | `CalculatorHub.jsx` | Drawer z wyborem kalkulatora |
+| 3.9 | `ScraperService.java` + `JsoupScraperService.java` | Scraper HTML |
+| 3.10 | `XlsxParserService.java` | Parser XLSX |
+| 3.11 | `ScraperController.java` | `POST /api/scraper/run`, `GET /api/scraper/log` |
+| 3.12 | `hooks/useLayerData.js` | React Query + auto-refresh |
 
-**Deliverable v1.2:** Scraper pobiera dane z ≥1 publicznego źródła.
-Wszystkie 3 kalkulatory działają z wynikami na mapie.
+**Deliverable v1.2:** Import z WFS działa (z fallbackiem). Wszystkie 3 kalkulatory
+zwracają wyniki. Scraper pobiera dane z ≥1 źródła.
 
 ---
 
-### ITERACJA v1.3 — AI & głos, deploy
+### ITERACJA v1.3 — UX i głos
 
-> Cel: agent social media, asystent głosowy, full-stack Docker, dokumentacja wdrożeniowa.
+> Cel: asystent głosowy, pełny Docker stack, testy wydajnościowe.
 
 | Krok | Plik / zadanie | Opis |
 |---|---|---|
-| 4.1 | `db/seed_social.sql` | 25+ demonstracyjnych postów z geolokalizacją |
-| 4.2 | `SocialMediaService.java` | Agent: parsowanie feed, ekstrakcja toponimów, geocoding |
-| 4.3 | `SocialMediaController.java` | REST: `GET /api/social/feed` |
-| 4.4 | `hooks/useSocialMediaFeed.js` | Hook pobierania feed |
-| 4.5 | `components/map/popups/SocialMediaPin.jsx` | Popup pinezki na mapie |
-| 4.6 | `components/panels/SocialMediaPanel.jsx` | Panel „Ostatnie sygnały" |
-| 4.7 | `components/voice/CommandParser.js` | Logika parsowania komend PL (regex + intent) |
-| 4.8 | `hooks/useVoiceCommands.js` | Hook Web Speech API + dispatcher akcji |
-| 4.9 | `components/voice/VoiceButton.jsx` | Przycisk mikrofonu z animacją |
-| 4.10 | `components/voice/VoiceAssistant.jsx` | Kontener: transkrypcja, feedback, fallback |
-| 4.11 | `services/geocoder.js` | Geokodowanie toponimów z komend głosowych |
-| 4.12 | `backend/Dockerfile` | Obraz Docker Spring Boot (OpenJDK 21) |
-| 4.13 | `frontend/Dockerfile` + `nginx.conf` | Obraz Docker React (Nginx) |
-| 4.14 | `docker-compose.full.yml` | Kompletny stack: postgres + backend + frontend |
-| 4.15 | `application-prod.yml` | Konfiguracja produkcyjna (pool, GC, logi) |
+| 4.1 | `CommandParser.js` + `hooks/useVoiceCommands.js` | Komendy głosowe PL |
+| 4.2 | `VoiceAssistant.jsx` + `VoiceButton.jsx` | UI asystenta |
+| 4.3 | `services/geocoder.js` | Geokodowanie toponimów z komend |
+| 4.4 | `backend/Dockerfile` | Obraz Docker Spring Boot |
+| 4.5 | `frontend/Dockerfile` + `nginx.conf` | Obraz Docker Nginx |
+| 4.6 | `docker-compose.full.yml` (finalizacja) | Kompletny stack |
+| 4.7 | `application-prod.yml` | Konfiguracja produkcyjna |
 
-**Deliverable v1.3:** Kompletny system z asystentem głosowym, agentem social media,
-pełnym stackiem Docker i gotową dokumentacją wdrożeniową.
+**Deliverable v1.3:** Kompletny system z asystentem głosowym i gotowym stackiem Docker.
 
 ---
 
-## 9. Ryzyka i mitygacje
+## 10. Ryzyki
 
 | Ryzyko | Mitygacja |
 |---|---|
-| GeoJSON granic niedostępny w dobrej jakości | GADM 4.1 jako źródło — instrukcja pobierania w `docs/DATA_SCHEMA.md` |
-| Web Speech API złe rozpoznawanie PL | Fallback Whisper API; przyciski predefiniowanych komend w UI |
-| OSRM public API niedostępne | Cache gotowych tras dla Top 10 placówek w tabeli `ike_results` |
-| Scraper MPIPS zmienia HTML | Selektory CSS w konfiguracji + last-successful cache w bazie |
-| Wydajność mapy przy 7 warstwach | MarkerCluster, lazy loading, zapytania PostGIS z `ST_MakeEnvelope` |
+| WFS ISOK niedostępny / zmienia schemat | Fallback syntetyczny; cache ostatniego importu w bazie |
+| `@Async` — trudniejsze debugowanie | Correlation ID w każdym evencie; szczegółowe logowanie agentów |
+| Race condition: DecisionAgent czyta IKE zanim IkeAgent skończy | DecisionAgent słucha `IkeRecalculatedEvent`, nie `ThreatUpdatedEvent` |
+| PostGIS wolne przy dużej liczbie placówek | Indeksy GiST; batch processing w IkeAgent |
+| GML z WFS w nieoczekiwanym układzie EPSG | Zawsze jawna transformacja w `WfsClientService` przed zapisem |
