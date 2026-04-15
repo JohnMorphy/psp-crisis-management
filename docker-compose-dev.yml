@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   postgres:
     image: postgis/postgis:15-3.4
@@ -21,30 +23,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-
-    container_name: gis_backend
-    restart: unless-stopped
-
-    ports:
-      - "8080:8080"
-
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-
-    depends_on:
-      postgres:
-        condition: service_healthy
- 
-  
-
 
 volumes:
   postgres_data:

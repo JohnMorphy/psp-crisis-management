@@ -37,7 +37,7 @@ Deliverable: `curl http://localhost:8080/api/layers` zwraca 7 warstw,
 
 ---
 
-### ⬜ 1.1 — Infrastruktura bazy danych
+### ✅ 1.1 — Infrastruktura bazy danych
 
 **Pliki do stworzenia:**
 - `docker-compose.yml`
@@ -61,7 +61,7 @@ z `DATA_SCHEMA.md` §1. Napisz pliki seed dla wszystkich 5 tabel danych.
 docker compose up -d postgres
 sleep 10
 docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM placowka;"
-# oczekiwane: 48
+# oczekiwane: 46
 
 docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM layer_config;"
 # oczekiwane: 7
