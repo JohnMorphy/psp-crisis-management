@@ -58,6 +58,8 @@ psp-crisis-management/          # katalog główny repo (jeden Git)
 ├── CLAUDE.md
 ├── docker-compose.yml          # tryb dev: tylko PostgreSQL + PostGIS
 ├── docker-compose.full.yml     # tryb full-stack: postgres + backend + frontend
+├── start-dev.cmd               # Windows: uruchamia postgres (tryb dev)
+├── start-all.cmd               # Windows: uruchamia pełny stack (docker-compose.full.yml)
 ├── .env.example
 ├── .gitignore
 ├── frontend/                   # aplikacja React (Vite) — zadanie 1.3
@@ -65,14 +67,24 @@ psp-crisis-management/          # katalog główny repo (jeden Git)
 │   └── src/
 ├── backend/                    # aplikacja Spring Boot (Maven)
 │   ├── pom.xml                 # groupId: qqq, artifactId: gis-map
-│   ├── Dockerfile
+│   ├── Dockerfile              # tworzony w zadaniu 4.2
 │   └── src/
 │       └── main/
 │           ├── java/pl/lublin/dashboard/   # package root
 │           │   ├── DashboardApplication.java
-│           │   └── config/
-│           │       ├── CorsConfig.java
-│           │       └── DataSourceConfig.java
+│           │   ├── config/
+│           │   │   ├── CorsConfig.java
+│           │   │   └── DataSourceConfig.java
+│           │   ├── model/                  # encje JPA — zadanie 1.4
+│           │   │   ├── Placowka.java
+│           │   │   ├── LayerConfig.java
+│           │   │   ├── StrefaZagrozen.java
+│           │   │   ├── MiejsceRelokacji.java
+│           │   │   └── ZasobTransportu.java
+│           │   └── repository/             # repozytoria JPA — zadanie 1.4
+│           │       ├── PlacowkaRepository.java
+│           │       ├── LayerConfigRepository.java
+│           │       └── StrefaZagrozenRepository.java
 │           └── resources/
 │               ├── application.yml
 │               ├── application-dev.yml
@@ -247,7 +259,7 @@ w `documentation/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 | Iteracja | Status | Deliverable |
 |---|---|---|
-| v1.0 — Fundament GIS | ⬜ Nie rozpoczęta | Mapa + granice + DPS-y + Spring Boot + PostGIS |
+| v1.0 — Fundament GIS | 🔄 W toku (1.1–1.4 ✅, 1.5–1.8 ⬜) | Mapa + granice + DPS-y + Spring Boot + PostGIS |
 | v1.1 — Event-driven core | ⬜ Nie rozpoczęta | ThreatUpdatedEvent + IkeAgent + DecisionAgent + WebSocket |
 | v1.2 — Import i kalkulatory | ⬜ Nie rozpoczęta | FloodImportAgent (WFS) + 3 kalkulatory + Scraper |
 | v1.3 — UX i głos | ⬜ Nie rozpoczęta | ScenarioPanel + asystent głosowy + Docker prod |
@@ -270,6 +282,10 @@ docker compose up -d postgres
 docker compose -f docker-compose.full.yml up --build
 # Frontend: http://localhost:3000  |  Backend: http://localhost:8080
 ```
+
+**Skróty dla Windows** (uruchamiaj dwuklikiem lub z cmd.exe):
+- `start-dev.cmd` — odpowiednik `docker compose up -d postgres`
+- `start-all.cmd` — odpowiednik `docker compose -f docker-compose.full.yml up --build`
 
 Szczegóły: `documentation/DEPLOYMENT.md`.
 

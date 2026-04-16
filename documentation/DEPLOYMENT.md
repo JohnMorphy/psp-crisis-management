@@ -102,6 +102,9 @@ OPENAI_API_KEY=sk-...   # tylko jeśli używasz Whisper jako fallback głosowy
 
 ## 4. Tryb dev — pierwsze uruchomienie (Windows + WSL2)
 
+> **Skrót dla Windows (cmd.exe):** zamiast kroków 3–6 możesz uruchomić `start-dev.cmd`
+> z katalogu głównego — startuje bazę i wyświetla instrukcję uruchomienia backendu i frontendu.
+
 Wykonaj kroki w podanej kolejności.
 
 ### Krok 1 — sklonuj repozytorium w WSL2
@@ -196,6 +199,9 @@ Otwórz `http://localhost:5173` w przeglądarce na Windows.
 ---
 
 ## 5. Tryb full-stack — uruchomienie jedną komendą
+
+> **Skrót dla Windows (cmd.exe):** `start-all.cmd` z katalogu głównego wykonuje
+> `docker compose -f docker-compose.full.yml up --build`.
 
 Nie wymaga lokalnej instalacji Javy ani Node.js. Tylko Docker Desktop + WSL2.
 

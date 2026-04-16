@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Aktywne:** `1.2 — Setup Spring Boot`
+**Aktywne:** `1.5 — GeoService + GeoJSON granic + endpoint warstw`
 
 ---
 
@@ -144,7 +144,7 @@ npm run dev
 
 ---
 
-### ⬜ 1.4 — Encje JPA i repozytoria
+### ✅ 1.4 — Encje JPA i repozytoria
 
 **Pliki do stworzenia:**
 - `backend/.../model/Placowka.java`
@@ -174,6 +174,11 @@ sleep 8
 curl -s http://localhost:8080/actuator/health
 # Brak błędów Hibernate w logach (grep "ERROR" w output mvnw)
 ```
+
+Dodatkowo: pliki cmd uruchamiające aplikacje za pomocą dockera:
+start-all.cmd (uruchamia docker-compose.full.yml)
+i
+start-dev.cmd (uruchamia docker-compose.yml)
 
 **Commit:** `feat(1.4): encje JPA — Placowka, LayerConfig, StrefaZagrozen, repozytoria`
 

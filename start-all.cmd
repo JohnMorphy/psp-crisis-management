@@ -1,0 +1,3 @@
+@echo off
+echo Uruchamianie pelnego stacku (PostgreSQL + backend + frontend)...
+docker compose -f docker-compose.full.yml up --build
