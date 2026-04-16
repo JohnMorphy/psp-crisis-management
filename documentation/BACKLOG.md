@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Aktywne:** `1.5 — GeoService + GeoJSON granic + endpoint warstw`
+**Aktywne:** `1.6 — IkeAgent (wersja synchroniczna) + IkeController`
 
 ---
 
@@ -225,7 +225,7 @@ curl -s http://localhost:8080/api/layers/L-99 | jq .code
 
 ---
 
-### ⬜ 1.6 — IkeAgent (wersja synchroniczna) + IkeController
+### ✅ 1.6 — IkeAgent (wersja synchroniczna) + IkeController
 
 **Pliki do stworzenia:**
 - `backend/.../agent/IkeAgent.java` (wersja v1.0 — bez eventów, wywołanie synchroniczne)

@@ -1,0 +1,22 @@
+{
+  "wagi": {
+    "zagrozenie": 0.35,
+    "niesamodzielni": 0.25,
+    "transport_brak": 0.20,
+    "droznosc_brak": 0.15,
+    "odleglosc_relokacji": 0.05
+  },
+  "progi": {
+    "czerwony": 0.70,
+    "zolty": 0.40
+  },
+  "promienie_km": {
+    "transport_dostepny": 15,
+    "miejsca_relokacji": 50
+  },
+  "wartosci_domyslne": {
+    "brak_danych_drogi": 0.5,
+    "brak_transportu_w_promieniu": 1.0,
+    "brak_danych_zagrozenia": 0.0
+  }
+}
