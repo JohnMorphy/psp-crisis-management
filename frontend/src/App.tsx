@@ -1,15 +1,8 @@
 import './App.css'
-import AppShell from './AppShell'
+import AppShell from './components/layout/AppShell'
 
 function App() {
-
-  return (
-    <>
-      <div id="container" className="min-h-screen dark:bg-gray-900">
-        <AppShell />
-      </div>
-    </>
-  )
+  return <AppShell />
 }
 
 export default App

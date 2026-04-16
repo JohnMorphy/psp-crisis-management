@@ -109,7 +109,7 @@ curl -s http://localhost:8080/actuator/health | jq .status
 
 ---
 
-### ⬜ 1.3 — Setup frontend (Vite + React + Leaflet)
+### ✅ 1.3 — Setup frontend (Vite + React + Leaflet)
 
 **Pliki do stworzenia:**
 - `frontend/package.json`
