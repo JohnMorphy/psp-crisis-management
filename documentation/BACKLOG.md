@@ -184,7 +184,7 @@ start-dev.cmd (uruchamia docker-compose.yml)
 
 ---
 
-### ⬜ 1.5 — GeoService + GeoJSON granic + endpoint warstw
+### ✅ 1.5 — GeoService + GeoJSON granic + endpoint warstw
 
 **Pliki do stworzenia:**
 - `backend/.../service/GeoService.java`

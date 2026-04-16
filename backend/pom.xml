@@ -68,6 +68,13 @@
 			<artifactId>hibernate-spatial</artifactId>
 		</dependency>
 
+		<!-- JTS I/O — GeoJsonWriter (ta sama wersja co jts-core z hibernate-spatial) -->
+		<dependency>
+			<groupId>org.locationtech.jts.io</groupId>
+			<artifactId>jts-io-common</artifactId>
+			<version>1.19.0</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>
