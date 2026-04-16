@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Aktywne:** `1.6 — IkeAgent (wersja synchroniczna) + IkeController`
+**Aktywne:** `1.7 — Mapa Leaflet z granicami i warstwą DPS`
 
 ---
 
@@ -272,7 +272,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 
 ---
 
-### ⬜ 1.7 — Mapa Leaflet z granicami i warstwą DPS
+### ✅ 1.7 — Mapa Leaflet z granicami i warstwą DPS
 
 **Pliki do stworzenia:**
 - `frontend/src/components/map/MapContainer.jsx`

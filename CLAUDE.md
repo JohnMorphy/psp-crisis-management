@@ -259,7 +259,7 @@ w `documentation/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 | Iteracja | Status | Deliverable |
 |---|---|---|
-| v1.0 — Fundament GIS | 🔄 W toku (1.1–1.4 ✅, 1.5–1.8 ⬜) | Mapa + granice + DPS-y + Spring Boot + PostGIS |
+| v1.0 — Fundament GIS | 🔄 W toku (1.1–1.7 ✅, 1.8 ⬜) | Mapa + granice + DPS-y + Spring Boot + PostGIS |
 | v1.1 — Event-driven core | ⬜ Nie rozpoczęta | ThreatUpdatedEvent + IkeAgent + DecisionAgent + WebSocket |
 | v1.2 — Import i kalkulatory | ⬜ Nie rozpoczęta | FloodImportAgent (WFS) + 3 kalkulatory + Scraper |
 | v1.3 — UX i głos | ⬜ Nie rozpoczęta | ScenarioPanel + asystent głosowy + Docker prod |

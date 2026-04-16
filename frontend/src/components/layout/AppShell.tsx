@@ -1,4 +1,5 @@
 import Header from './Header'
+import MapContainer from '../map/MapContainer'
 
 function AppShell() {
   return (
@@ -6,7 +7,7 @@ function AppShell() {
       <Header />
       <div className="flex flex-1 overflow-hidden">
         <main className="w-[70%] bg-gray-950">
-          {/* MapContainer — zadanie 1.7 */}
+          <MapContainer />
         </main>
         <aside className="w-[30%] bg-gray-800 overflow-y-auto border-l border-gray-700">
           {/* ScenarioPanel, LayerControlPanel, Top10Panel, DecisionPanel — kolejne zadania */}

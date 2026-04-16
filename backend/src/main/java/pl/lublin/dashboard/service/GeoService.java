@@ -9,10 +9,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import pl.lublin.dashboard.model.IkeResult;
 import pl.lublin.dashboard.model.MiejsceRelokacji;
 import pl.lublin.dashboard.model.Placowka;
 import pl.lublin.dashboard.model.StrefaZagrozen;
 import pl.lublin.dashboard.model.ZasobTransportu;
+import pl.lublin.dashboard.repository.IkeResultRepository;
 import pl.lublin.dashboard.repository.MiejsceRelokacjiRepository;
 import pl.lublin.dashboard.repository.PlacowkaRepository;
 import pl.lublin.dashboard.repository.StrefaZagrozenRepository;
@@ -22,6 +24,7 @@ import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class GeoService {
@@ -32,6 +35,7 @@ public class GeoService {
     @Autowired private StrefaZagrozenRepository strefaZagrozenRepository;
     @Autowired private MiejsceRelokacjiRepository miejscaRelokacjiRepository;
     @Autowired private ZasobTransportuRepository zasobTransportuRepository;
+    @Autowired private IkeResultRepository ikeResultRepository;
     @Autowired private ObjectMapper objectMapper;
 
     private final GeoJsonWriter geoJsonWriter;
@@ -81,8 +85,11 @@ public class GeoService {
             ? placowkaRepository.findByPowiat(powiat)
             : placowkaRepository.findAll();
 
+        Map<String, IkeResult> ikeMap = ikeResultRepository.findAll().stream()
+            .collect(Collectors.toMap(IkeResult::getPlacowkaKod, r -> r));
+
         List<Map<String, Object>> features = placowki.stream()
-            .map(this::placowkaToFeature)
+            .map(p -> placowkaToFeature(p, ikeMap.get(p.getKod())))
             .filter(Objects::nonNull)
             .toList();
 
@@ -136,7 +143,7 @@ public class GeoService {
         return fc;
     }
 
-    private Map<String, Object> placowkaToFeature(Placowka p) {
+    private Map<String, Object> placowkaToFeature(Placowka p, IkeResult ike) {
         Map<String, Object> geometry = geometryToMap(p.getGeom());
         if (geometry == null) return null;
 
@@ -151,8 +158,8 @@ public class GeoService {
         props.put("niesamodzielni_procent", p.getNiesamodzielniProcent());
         props.put("generator_backup", p.getGeneratorBackup());
         props.put("kontakt", p.getKontakt());
-        props.put("ike_score", null);      // computed by IkeAgent (task 1.6)
-        props.put("ike_kategoria", null);  // computed by IkeAgent (task 1.6)
+        props.put("ike_score", ike != null ? ike.getIkeScore() : null);
+        props.put("ike_kategoria", ike != null ? ike.getIkeKategoria() : null);
 
         return buildFeature(geometry, props);
     }
