@@ -280,7 +280,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 - `frontend/src/components/map/layers/DPSLayer.jsx`
 - `frontend/src/components/map/layers/ZagrozeniaLayer.jsx`
 - `frontend/src/components/map/DPSPopup.jsx`
-- `frontend/src/hooks/useLayerData.js`
+- `frontend/src/hooks/useLayerData.ts`
 
 **Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup DPS, kolory IKE), `documentation/API_REFERENCE.md` (`GET /api/layers/{id}`)
 
@@ -321,7 +321,7 @@ Manualne — przeglądarka http://localhost:5173:
 **Opis:**
 `LayerControlPanel` — lista warstw z `GET /api/layers`, toggle włącz/wyłącz każdą,
 znacznik czasu ostatniej aktualizacji.
-`RegionInfoPanel` — statystyki klikniętego powiatu (liczba placówek, suma podopiecznych).
+`RegionInfoPanel` — statystyki klikniętego regionu (liczba placówek, suma podopiecznych).
 `mapStore` (Zustand) — aktywne warstwy, wybrany region.
 Panel boczny zwijany (`<<` przycisk).
 

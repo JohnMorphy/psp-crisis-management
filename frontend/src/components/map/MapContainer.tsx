@@ -2,15 +2,15 @@ import { MapContainer as LeafletMapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import AdminBoundaries from './AdminBoundaries'
 import DPSLayer from './layers/DPSLayer'
-import ZagrozeniaLayer from './layers/ZagrozeniaLayer'
+import ThreatZoneLayer from './layers/ThreatZoneLayer'
 
-const LUBLIN_CENTER = [51.25, 22.57]
+const MAP_CENTER: [number, number] = [51.25, 22.57]
 const INITIAL_ZOOM = 9
 
 function MapContainer() {
   return (
     <LeafletMapContainer
-      center={LUBLIN_CENTER}
+      center={MAP_CENTER}
       zoom={INITIAL_ZOOM}
       style={{ height: '100%', width: '100%' }}
     >
@@ -19,7 +19,7 @@ function MapContainer() {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <AdminBoundaries />
-      <ZagrozeniaLayer />
+      <ThreatZoneLayer />
       <DPSLayer />
     </LeafletMapContainer>
   )

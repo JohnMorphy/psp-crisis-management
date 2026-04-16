@@ -1,6 +1,8 @@
 import { useRef } from 'react'
 import { GeoJSON } from 'react-leaflet'
+import type { Layer } from 'leaflet'
 import { useLayerData } from '../../hooks/useLayerData'
+import type { GeoJsonCollection } from '../../types/gis'
 
 const DEFAULT_STYLE = {
   color: '#4B5563',
@@ -17,26 +19,26 @@ const SELECTED_STYLE = {
 }
 
 function AdminBoundaries() {
-  const { data } = useLayerData('L-00')
-  const selectedLayerRef = useRef(null)
+  const { data } = useLayerData<GeoJsonCollection>('L-00')
+  const selectedLayerRef = useRef<Layer | null>(null)
 
   if (!data?.features) return null
 
-  const onEachFeature = (_feature, layer) => {
+  const onEachFeature = (_feature: unknown, layer: Layer) => {
     layer.on('click', () => {
       if (selectedLayerRef.current) {
-        selectedLayerRef.current.setStyle(DEFAULT_STYLE)
+        (selectedLayerRef.current as unknown as { setStyle: (s: object) => void }).setStyle(DEFAULT_STYLE)
       }
-      layer.setStyle(SELECTED_STYLE)
+      (layer as unknown as { setStyle: (s: object) => void }).setStyle(SELECTED_STYLE)
       selectedLayerRef.current = layer
     })
   }
 
   return (
     <GeoJSON
-      data={data}
+      data={data as unknown as GeoJSON.GeoJsonObject}
       style={DEFAULT_STYLE}
-      onEachFeature={onEachFeature}
+      onEachFeature={onEachFeature as never}
     />
   )
 }

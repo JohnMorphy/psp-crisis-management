@@ -1,10 +1,24 @@
-const IKE_CONFIG = {
+import type { FacilityProperties, IkeCategory } from '../../types/gis'
+
+interface IkeDisplayConfig {
+  emoji: string
+  label: string
+  color: string
+}
+
+const IKE_DISPLAY: Record<IkeCategory, IkeDisplayConfig> = {
   czerwony: { emoji: '🔴', label: 'EWAKUACJA NATYCHMIASTOWA', color: '#EF4444' },
   zolty:    { emoji: '🟡', label: 'PRZYGOTUJ EWAKUACJĘ',      color: '#F59E0B' },
   zielony:  { emoji: '🟢', label: 'MONITORUJ',                color: '#22C55E' },
 }
 
-function DPSPopup({ properties }) {
+const FALLBACK_DISPLAY: IkeDisplayConfig = { emoji: '⚪', label: 'BRAK DANYCH', color: '#6B7280' }
+
+interface DPSPopupProps {
+  properties: FacilityProperties
+}
+
+function DPSPopup({ properties }: DPSPopupProps) {
   const {
     nazwa,
     powiat,
@@ -18,12 +32,12 @@ function DPSPopup({ properties }) {
     ike_kategoria,
   } = properties
 
-  const niesamodzielniCount =
+  const dependentCount =
     liczba_podopiecznych != null && niesamodzielni_procent != null
       ? Math.round(liczba_podopiecznych * niesamodzielni_procent)
       : null
 
-  const ike = IKE_CONFIG[ike_kategoria] || { emoji: '⚪', label: 'BRAK DANYCH', color: '#6B7280' }
+  const ike = ike_kategoria ? (IKE_DISPLAY[ike_kategoria] ?? FALLBACK_DISPLAY) : FALLBACK_DISPLAY
 
   return (
     <div style={{ minWidth: 240, fontSize: 14, lineHeight: 1.5 }}>
@@ -36,7 +50,7 @@ function DPSPopup({ properties }) {
       <hr style={{ border: 'none', borderTop: '1px solid #374151', marginBottom: 8 }} />
       <div style={{ marginBottom: 4 }}>
         Podopieczni: <strong>{liczba_podopiecznych ?? '—'}</strong>
-        {niesamodzielniCount != null ? ` (${niesamodzielniCount} niesamodz.)` : ''}
+        {dependentCount != null ? ` (${dependentCount} niesamodz.)` : ''}
       </div>
       <div style={{ marginBottom: 4 }}>
         Pojemność: <strong>{pojemnosc_ogolna ?? '—'}</strong>
@@ -62,7 +76,7 @@ function DPSPopup({ properties }) {
   )
 }
 
-const btnStyle = {
+const btnStyle: React.CSSProperties = {
   background: '#1E3A5F',
   border: '1px solid #3B82F6',
   color: '#93C5FD',
