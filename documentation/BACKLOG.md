@@ -78,7 +78,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT ST_AsTex
 
 ---
 
-### 🔄 1.2 — Setup Spring Boot
+### ✅ 1.2 — Setup Spring Boot
 
 **Pliki do stworzenia:**
 - `backend/pom.xml`
@@ -113,7 +113,7 @@ curl -s http://localhost:8080/actuator/health | jq .status
 
 **Pliki do stworzenia:**
 - `frontend/package.json`
-- `frontend/vite.config.js`
+- `frontend/vite.config.ts`
 - `frontend/tailwind.config.js`
 - `frontend/src/main.jsx`
 - `frontend/src/App.jsx`
