@@ -115,11 +115,11 @@ curl -s http://localhost:8080/actuator/health | jq .status
 - `frontend/package.json`
 - `frontend/vite.config.ts`
 - `frontend/tailwind.config.js`
-- `frontend/src/main.jsx`
-- `frontend/src/App.jsx`
-- `frontend/src/services/api.js`
-- `frontend/src/components/layout/AppShell.jsx`
-- `frontend/src/components/layout/Header.jsx`
+- `frontend/src/main.tsx`
+- `frontend/src/App.tsx`
+- `frontend/src/services/api.ts`
+- `frontend/src/components/layout/AppShell.tsx`
+- `frontend/src/components/layout/Header.tsx`
 
 **Dokumenty referencyjne:** `CLAUDE.md` (sekcja Stack technologiczny, Layout aplikacji)
 
@@ -127,7 +127,7 @@ curl -s http://localhost:8080/actuator/health | jq .status
 Vite + React 18 + Tailwind CSS. Zależności npm: `react-leaflet`, `leaflet`, `zustand`,
 `@tanstack/react-query`, `axios`.
 Layout 70/30: mapa po lewej (placeholder `<div>`), panel boczny po prawej (Do wykonania w przyszłym zadaniu)
-`api.js` — klient axios z `baseURL` z `VITE_API_BASE_URL`.
+`api.ts` — klient axios z `baseURL` z `VITE_API_BASE_URL`.
 Ciemny motyw: `bg-gray-900`.
 
 **Weryfikacja:**
@@ -140,7 +140,7 @@ npm run dev
 # DevTools: brak błędów konsoli
 ```
 
-**Commit:** `feat(1.3): Vite + React 18 + Tailwind — AppShell, Header, api.js`
+**Commit:** `feat(1.3): Vite + React 18 + Tailwind — AppShell, Header, api.ts`
 
 ---
 
@@ -275,11 +275,11 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 ### ✅ 1.7 — Mapa Leaflet z granicami i warstwą DPS
 
 **Pliki do stworzenia:**
-- `frontend/src/components/map/MapContainer.jsx`
-- `frontend/src/components/map/AdminBoundaries.jsx`
-- `frontend/src/components/map/layers/DPSLayer.jsx`
-- `frontend/src/components/map/layers/ZagrozeniaLayer.jsx`
-- `frontend/src/components/map/DPSPopup.jsx`
+- `frontend/src/components/map/MapContainer.tsx`
+- `frontend/src/components/map/AdminBoundaries.tsx`
+- `frontend/src/components/map/layers/DPSLayer.tsx`
+- `frontend/src/components/map/layers/ThreatZoneLayer.tsx`
+- `frontend/src/components/map/DPSPopup.tsx`
 - `frontend/src/hooks/useLayerData.ts`
 
 **Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup DPS, kolory IKE), `documentation/API_REFERENCE.md` (`GET /api/layers/{id}`)
@@ -290,7 +290,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 `DPSLayer` — markery z `GET /api/layers/L-01`, kolor wg `ike_kategoria`
 (czerwony `#EF4444` / żółty `#F59E0B` / zielony `#22C55E`).
 `DPSPopup` — Leaflet Popup (nie modal) z danymi z `properties`.
-`ZagrozeniaLayer` — poligony z `GET /api/layers/L-03`.
+`ThreatZoneLayer` — poligony z `GET /api/layers/L-03`.
 `useLayerData` — React Query z `staleTime: 60_000`.
 
 **Weryfikacja:**
@@ -305,16 +305,16 @@ Manualne — przeglądarka http://localhost:5173:
 ☐ DevTools Network: GET /api/layers/L-01 → 200, feature_count: 48
 ```
 
-**Commit:** `feat(1.7): MapContainer + AdminBoundaries + DPSLayer + ZagrozeniaLayer`
+**Commit:** `feat(1.7): MapContainer + AdminBoundaries + DPSLayer + ThreatZoneLayer`
 
 ---
 
 ### ⬜ 1.8 — Panele boczne v1.0
 
 **Pliki do stworzenia:**
-- `frontend/src/components/panels/LayerControlPanel.jsx`
-- `frontend/src/components/panels/RegionInfoPanel.jsx`
-- `frontend/src/store/mapStore.js`
+- `frontend/src/components/panels/LayerControlPanel.tsx`
+- `frontend/src/components/panels/RegionInfoPanel.tsx`
+- `frontend/src/store/mapStore.ts`
 
 **Dokumenty referencyjne:** `CLAUDE.md` (Layout aplikacji), `documentation/API_REFERENCE.md` (`GET /api/layers`)
 
@@ -553,14 +553,14 @@ curl -s -X POST http://localhost:8080/api/threat/flood/import \
 ### ⬜ 2.6 — Frontend: WebSocket client + ScenarioPanel
 
 **Pliki do stworzenia:**
-- `frontend/src/services/websocketService.js`
-- `frontend/src/hooks/useWebSocket.js`
-- `frontend/src/components/panels/ScenarioPanel.jsx`
+- `frontend/src/services/websocketService.ts`
+- `frontend/src/hooks/useWebSocket.ts`
+- `frontend/src/components/panels/ScenarioPanel.tsx`
 
 **Dokumenty referencyjne:** `CLAUDE.md` (Layout — ScenarioPanel), `documentation/API_REFERENCE.md` (sekcja WebSocket, `POST /api/threat/flood/import`)
 
 **Opis:**
-`websocketService.js` — SockJS + `@stomp/stompjs`, reconnect 5s.
+`websocketService.ts` — SockJS + `@stomp/stompjs`, reconnect 5s.
 `useWebSocket` — hook subskrybujący topiki `/topic/ike`, `/topic/decisions`,
 `/topic/layers/L-03`, `/topic/system`. Po `/topic/ike` aktualizuje Zustand store.
 Po `/topic/layers/L-03` wywołuje `queryClient.invalidateQueries(['layers', 'L-03'])`.
@@ -586,13 +586,13 @@ Manualne — przeglądarka http://localhost:5173:
 ### ⬜ 2.7 — Frontend: DecisionPanel + Top10Panel
 
 **Pliki do stworzenia:**
-- `frontend/src/components/panels/DecisionPanel.jsx`
-- `frontend/src/components/panels/Top10Panel.jsx`
-- `frontend/src/components/panels/FilterPanel.jsx`
-- `frontend/src/components/map/layers/EvacuationRoute.jsx`
-- `frontend/src/services/routingService.js`
-- `frontend/src/utils/colorScale.js`
-- `frontend/src/components/shared/IKEScore.jsx`
+- `frontend/src/components/panels/DecisionPanel.tsx`
+- `frontend/src/components/panels/Top10Panel.tsx`
+- `frontend/src/components/panels/FilterPanel.tsx`
+- `frontend/src/components/map/layers/EvacuationRoute.tsx`
+- `frontend/src/services/routingService.ts`
+- `frontend/src/utils/colorScale.ts`
+- `frontend/src/components/shared/IKEScore.tsx`
 
 **Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory IKE), `documentation/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
 
@@ -601,8 +601,8 @@ Manualne — przeglądarka http://localhost:5173:
 `DecisionPanel` — lista rekomendacji, przyciski "Zatwierdź" / "Odrzuć" (`PATCH /api/decisions/{id}`).
 `FilterPanel` — filtr IKE kategoria + powiat, wpływa na `DPSLayer`.
 `EvacuationRoute` — rysuje `trasa_ewakuacji_geojson` jako LineString na mapie po kliknięciu.
-`routingService.js` — zapytanie do OSRM `router.project-osrm.org`.
-`colorScale.js` — funkcja `ikeToColor(score)` → hex.
+`routingService.ts` — zapytanie do OSRM `router.project-osrm.org`.
+`colorScale.ts` — funkcja `ikeToColor(score)` → hex.
 
 **Weryfikacja:**
 ```
@@ -621,11 +621,11 @@ Manualne po aktywacji scenariusza Q100/chelm:
 ### ⬜ 2.8 — Pozostałe warstwy GIS (L-02, L-04–L-07)
 
 **Pliki do stworzenia:**
-- `frontend/src/components/map/layers/HeatmapLayer.jsx`
-- `frontend/src/components/map/layers/DrogiLayer.jsx`
-- `frontend/src/components/map/layers/TransportLayer.jsx`
-- `frontend/src/components/map/layers/RelokacjaLayer.jsx`
-- `frontend/src/components/map/layers/BialePlamiLayer.jsx`
+- `frontend/src/components/map/layers/HeatmapLayer.tsx`
+- `frontend/src/components/map/layers/DrogiLayer.tsx`
+- `frontend/src/components/map/layers/TransportLayer.tsx`
+- `frontend/src/components/map/layers/RelokacjaLayer.tsx`
+- `frontend/src/components/map/layers/BialePlamiLayer.tsx`
 - `backend/src/main/resources/db/seed_drogi.sql` (kilka przykładowych dróg)
 - `backend/src/main/resources/db/seed_biale_plamy.sql`
 
@@ -734,10 +734,10 @@ curl -s -X POST http://localhost:8080/api/calculate/relocation \
 ### ⬜ 3.3 — Kalkulatory (frontend UI)
 
 **Pliki do stworzenia:**
-- `frontend/src/components/calculators/TransportCalculator.jsx`
-- `frontend/src/components/calculators/RelocationCalculator.jsx`
-- `frontend/src/components/calculators/ThreatSpreadCalculator.jsx`
-- `frontend/src/components/calculators/CalculatorHub.jsx`
+- `frontend/src/components/calculators/TransportCalculator.tsx`
+- `frontend/src/components/calculators/RelocationCalculator.tsx`
+- `frontend/src/components/calculators/ThreatSpreadCalculator.tsx`
+- `frontend/src/components/calculators/CalculatorHub.tsx`
 
 **Dokumenty referencyjne:** `documentation/PRD.md` (§5.2 F-10)
 
@@ -802,18 +802,18 @@ Cel: asystent głosowy (Web Speech API + Whisper fallback), pełny Docker stack 
 ### ⬜ 4.1 — Asystent głosowy
 
 **Pliki do stworzenia:**
-- `frontend/src/services/voiceService.js`
-- `frontend/src/hooks/useVoiceCommands.js`
-- `frontend/src/utils/commandParser.js`
-- `frontend/src/components/voice/VoiceAssistant.jsx`
-- `frontend/src/components/voice/VoiceButton.jsx`
+- `frontend/src/services/voiceService.ts`
+- `frontend/src/hooks/useVoiceCommands.ts`
+- `frontend/src/utils/commandParser.ts`
+- `frontend/src/components/voice/VoiceAssistant.tsx`
+- `frontend/src/components/voice/VoiceButton.tsx`
 
 **Dokumenty referencyjne:** `documentation/PRD.md` (§5.2 F-12 — tabela komend)
 
 **Opis:**
-`voiceService.js` — Web Speech API (`SpeechRecognition`), język `pl-PL`.
+`voiceService.ts` — Web Speech API (`SpeechRecognition`), język `pl-PL`.
 Fallback: Whisper API (`VITE_OPENAI_API_KEY`) gdy Web Speech API niedostępne.
-`commandParser.js` — mapowanie fraz na akcje (7 komend z tabeli F-12 w PRD).
+`commandParser.ts` — mapowanie fraz na akcje (7 komend z tabeli F-12 w PRD).
 `useVoiceCommands` — hook wywołujący akcje Zustand store lub API.
 `VoiceButton` — przycisk mikrofonu w headerze, aktywacja Spacja.
 

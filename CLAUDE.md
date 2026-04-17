@@ -53,51 +53,7 @@ eliminując race condition.
 
 ## Struktura repozytorium
 
-```
-psp-crisis-management/          # katalog główny repo (jeden Git)
-├── CLAUDE.md
-├── docker-compose.yml          # tryb dev: tylko PostgreSQL + PostGIS
-├── docker-compose.full.yml     # tryb full-stack: postgres + backend + frontend
-├── start-dev.cmd               # Windows: uruchamia postgres (tryb dev)
-├── start-all.cmd               # Windows: uruchamia pełny stack (docker-compose.full.yml)
-├── .env.example
-├── .gitignore
-├── frontend/                   # aplikacja React (Vite) — zadanie 1.3
-│   ├── package.json
-│   └── src/
-├── backend/                    # aplikacja Spring Boot (Maven)
-│   ├── pom.xml                 # groupId: qqq, artifactId: gis-map
-│   ├── Dockerfile              # tworzony w zadaniu 4.2
-│   └── src/
-│       └── main/
-│           ├── java/pl/lublin/dashboard/   # package root
-│           │   ├── DashboardApplication.java
-│           │   ├── config/
-│           │   │   ├── CorsConfig.java
-│           │   │   └── DataSourceConfig.java
-│           │   ├── model/                  # encje JPA — zadanie 1.4
-│           │   │   ├── Placowka.java
-│           │   │   ├── LayerConfig.java
-│           │   │   ├── StrefaZagrozen.java
-│           │   │   ├── MiejsceRelokacji.java
-│           │   │   └── ZasobTransportu.java
-│           │   └── repository/             # repozytoria JPA — zadanie 1.4
-│           │       ├── PlacowkaRepository.java
-│           │       ├── LayerConfigRepository.java
-│           │       └── StrefaZagrozenRepository.java
-│           └── resources/
-│               ├── application.yml
-│               ├── application-dev.yml
-│               └── db/                     # SQL init (docker-entrypoint-initdb.d)
-└── documentation/
-    ├── PRD.md
-    ├── ARCHITEKTURA_PLAN.md
-    ├── BACKLOG.md
-    ├── DATA_SCHEMA.md
-    ├── IKE_ALGORITHM.md
-    ├── API_REFERENCE.md
-    └── DEPLOYMENT.md
-```
+Pełna, aktualna struktura katalogów: `documentation/ARCHITEKTURA_PLAN.md` §5.
 
 **Zasada izolacji:** frontend i backend to dwa osobne projekty — nie importują wzajemnie
 swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (STOMP).
@@ -192,11 +148,11 @@ w `documentation/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 - ✅ `zrodlo` w każdym rekordzie: `'syntetyczne'` | `'wfs'` | `'scraping'` | `'mpips'`.
 
 ### Kod
-- ✅ Nazwy plików: **tylko ASCII** (np. `BialePlamiLayer.jsx`).
+- ✅ Nazwy plików: **tylko ASCII** (np. `LayerConfig.tsx`).
 - ✅ Każdy endpoint REST zwraca błędy:
   `{ "error": "...", "code": "ERROR_CODE", "timestamp": "..." }`.
 - ❌ Nie używaj `@Transactional` na kontrolerach — tylko na serwisach.
-- ❌ Nie hardcoduj URL-i backendu w komponentach React — używaj `services/api.js`.
+- ❌ Nie hardcoduj URL-i backendu w komponentach React — używaj `services/api.ts`.
 - ❌ Nie używaj `localStorage` ani `sessionStorage`.
 
 ### UI

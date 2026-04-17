@@ -340,85 +340,86 @@ Działanie po IkeRecalculatedEvent:
 │
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.js
+│   ├── vite.config.ts
 │   ├── tailwind.config.js
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   │
 │   └── src/
-│       ├── main.jsx
-│       ├── App.jsx
+│       ├── main.tsx
+│       ├── App.tsx
 │       │
 │       ├── config/
 │       │   ├── layers.config.json      # konfiguracja warstw (fallback offline)
 │       │   └── ike.config.json         # wagi IKE
 │       │
+│       ├── types/
+│       │   └── gis.ts                  # typy GeoJSON + FacilityProperties + ThreatZoneProperties
+│       │
 │       ├── components/
 │       │   ├── layout/
-│       │   │   ├── AppShell.jsx
-│       │   │   ├── Header.jsx
-│       │   │   └── Sidebar.jsx
+│       │   │   ├── AppShell.tsx
+│       │   │   ├── Header.tsx
+│       │   │   └── Sidebar.tsx
 │       │   │
 │       │   ├── map/
-│       │   │   ├── MapContainer.jsx
-│       │   │   ├── MapControls.jsx
-│       │   │   ├── LayerManager.jsx
-│       │   │   ├── AdminBoundaries.jsx
-│       │   │   ├── EvacuationRoute.jsx
-│       │   │   ├── layers/
-│       │   │   │   ├── DPSLayer.jsx
-│       │   │   │   ├── HeatmapLayer.jsx
-│       │   │   │   ├── ZagrozeniaLayer.jsx
-│       │   │   │   ├── DrogiLayer.jsx
-│       │   │   │   ├── TransportLayer.jsx
-│       │   │   │   ├── RelokacjaLayer.jsx
-│       │   │   │   └── BialePlamiLayer.jsx
-│       │   │   └── popups/
-│       │   │       ├── DPSPopup.jsx
-│       │   │       └── TransportPopup.jsx
+│       │   │   ├── MapContainer.tsx
+│       │   │   ├── MapControls.tsx
+│       │   │   ├── LayerManager.tsx
+│       │   │   ├── AdminBoundaries.tsx
+│       │   │   ├── DPSPopup.tsx
+│       │   │   ├── EvacuationRoute.tsx
+│       │   │   └── layers/
+│       │   │       ├── DPSLayer.tsx
+│       │   │       ├── HeatmapLayer.tsx
+│       │   │       ├── ThreatZoneLayer.tsx
+│       │   │       ├── DrogiLayer.tsx
+│       │   │       ├── TransportLayer.tsx
+│       │   │       ├── RelokacjaLayer.tsx
+│       │   │       └── BialePlamiLayer.tsx
 │       │   │
 │       │   ├── panels/
-│       │   │   ├── ScenarioPanel.jsx       # ★ wybór scenariusza zagrożenia
-│       │   │   ├── DecisionPanel.jsx       # ★ rekomendacje DecisionAgent
-│       │   │   ├── LayerControlPanel.jsx
-│       │   │   ├── FilterPanel.jsx
-│       │   │   ├── Top10Panel.jsx
-│       │   │   └── RegionInfoPanel.jsx
+│       │   │   ├── ScenarioPanel.tsx       # ★ wybór scenariusza zagrożenia
+│       │   │   ├── DecisionPanel.tsx       # ★ rekomendacje DecisionAgent
+│       │   │   ├── LayerControlPanel.tsx
+│       │   │   ├── FilterPanel.tsx
+│       │   │   ├── Top10Panel.tsx
+│       │   │   └── RegionInfoPanel.tsx
 │       │   │
 │       │   ├── calculators/
-│       │   │   ├── CalculatorHub.jsx
-│       │   │   ├── TransportCalculator.jsx
-│       │   │   ├── RelocationCalculator.jsx
-│       │   │   └── ThreatSpreadCalculator.jsx
+│       │   │   ├── CalculatorHub.tsx
+│       │   │   ├── TransportCalculator.tsx
+│       │   │   ├── RelocationCalculator.tsx
+│       │   │   └── ThreatSpreadCalculator.tsx
 │       │   │
 │       │   ├── voice/
-│       │   │   ├── VoiceAssistant.jsx
-│       │   │   ├── VoiceButton.jsx
-│       │   │   └── CommandParser.js
+│       │   │   ├── VoiceAssistant.tsx
+│       │   │   ├── VoiceButton.tsx
+│       │   │   └── CommandParser.ts
 │       │   │
 │       │   └── ui/
-│       │       ├── Badge.jsx
-│       │       ├── StatusIndicator.jsx
-│       │       ├── IKEScore.jsx
-│       │       ├── Tooltip.jsx
-│       │       └── Modal.jsx
+│       │       ├── Badge.tsx
+│       │       ├── StatusIndicator.tsx
+│       │       ├── IKEScore.tsx
+│       │       ├── Tooltip.tsx
+│       │       └── Modal.tsx
 │       │
 │       ├── hooks/
-│       │   ├── useLayerData.js
-│       │   ├── useWebSocket.js
-│       │   ├── useFilters.js
-│       │   └── useVoiceCommands.js
+│       │   ├── useLayerData.ts
+│       │   ├── useWebSocket.ts
+│       │   ├── useFilters.ts
+│       │   └── useVoiceCommands.ts
 │       │
 │       ├── services/
-│       │   ├── api.js
-│       │   ├── websocketService.js
-│       │   ├── geocoder.js
-│       │   └── routingService.js
+│       │   ├── api.ts
+│       │   ├── websocketService.ts
+│       │   ├── geocoder.ts
+│       │   └── routingService.ts
 │       │
 │       └── utils/
-│           ├── colorScale.js
-│           ├── formatters.js
-│           └── geoUtils.js
+│           ├── colorScale.ts
+│           ├── formatters.ts
+│           └── geoUtils.ts
 │
 ├── backend/
 │   ├── pom.xml

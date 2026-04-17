@@ -1,5 +1,6 @@
 import Header from './Header'
 import MapContainer from '../map/MapContainer'
+import LayerControlPanel from '../panels/LayerControlPanel'
 
 function AppShell() {
   return (
@@ -10,6 +11,7 @@ function AppShell() {
           <MapContainer />
         </main>
         <aside className="w-[30%] bg-gray-800 overflow-y-auto border-l border-gray-700">
+          <LayerControlPanel />
           {/* ScenarioPanel, LayerControlPanel, Top10Panel, DecisionPanel — kolejne zadania */}
         </aside>
       </div>
