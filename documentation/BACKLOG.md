@@ -342,8 +342,8 @@ Manualne:
 
 **Pliki do stworzenia / modyfikacji:**
 - `backend/src/main/resources/db/schema.sql` (dodaj tabelę `granice_administracyjne`)
-- `backend/.../model/GranicaAdministracyjna.java`
-- `backend/.../repository/GranicaAdministracyjnaRepository.java`
+- `backend/.../model/AdministrativeBoudries.java`
+- `backend/.../repository/AdministrativeBoudriesRepository.java`
 - `backend/.../agent/AdminBoundaryImportAgent.java`
 - `backend/.../controller/AdminBoundaryController.java`
 

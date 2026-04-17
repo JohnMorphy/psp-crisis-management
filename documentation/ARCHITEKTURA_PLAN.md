@@ -473,7 +473,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │
 │       │   ├── repository/
 │       │   │   ├── PlacowkaRepository.java
-│       │   │   ├── GranicaAdministracyjnaRepository.java# ★ granice_administracyjne
+│       │   │   ├── AdminBoundaryRepository.java# ★ granice_administracyjne
 │       │   │   ├── StrefaZagrozenRepository.java
 │       │   │   ├── IkeResultRepository.java
 │       │   │   ├── EvacuationDecisionRepository.java
@@ -482,7 +482,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │   └── TransportRepository.java
 │       │   │
 │       │   ├── model/
-│       │   │   ├── GranicaAdministracyjna.java # ★ encja granice_administracyjne
+│       │   │   ├── AdminBoundary.java # ★ encja granice_administracyjne
 │       │   │   ├── Placowka.java
 │       │   │   ├── StrefaZagrozen.java
 │       │   │   ├── IkeResult.java
