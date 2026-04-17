@@ -409,7 +409,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 
 ---
 
-### ⬜ 1.10 — API: warstwy L-08/L-09/L-10 (granice administracyjne całej Polski)
+### ✅ 1.10 — API: warstwy L-08/L-09/L-10 (granice administracyjne całej Polski)
 
 **Pliki do stworzenia / modyfikacji:**
 - `backend/.../service/AdminBoundaryService.java`

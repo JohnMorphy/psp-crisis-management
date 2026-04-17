@@ -35,4 +35,19 @@ VALUES
 ('L-07', 'Białe plamy transportowe',
  'BialePlamiLayer', 'Polygon', FALSE,
  '/api/layers/L-07', 3600, '#6B7280', 'map-off',
- 'Obszary bez regularnego transportu publicznego');
+ 'Obszary bez regularnego transportu publicznego'),
+
+('L-08', 'Granice województw',
+ 'AdminBoundaryLayer', 'MultiPolygon', TRUE,
+ '/api/layers/L-08', 86400, '#6366F1', 'map',
+ '16 granic województw (źródło: GUGiK PRG WFS)'),
+
+('L-09', 'Granice powiatów',
+ 'AdminBoundaryLayer', 'MultiPolygon', FALSE,
+ '/api/layers/L-09', 86400, '#4B5563', 'map',
+ 'Granice ~380 powiatów (źródło: GUGiK PRG WFS)'),
+
+('L-10', 'Granice gmin',
+ 'AdminBoundaryLayer', 'MultiPolygon', FALSE,
+ '/api/layers/L-10', 86400, '#374151', 'map',
+ 'Granice ~2477 gmin — wymaga filtra kod_woj lub bbox (źródło: GUGiK PRG WFS)');
