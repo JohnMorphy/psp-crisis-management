@@ -3,6 +3,7 @@ import type { Feature } from 'geojson'
 import type { PathOptions } from 'leaflet'
 import { useLayerData } from '../../../hooks/useLayerData'
 import type { GeoJsonCollection, ThreatZoneProperties } from '../../../types/gis'
+import { useMapStore } from '../../../store/mapStore'
 
 const LEVEL_COLORS: Record<string, string> = {
   czerwony:     '#EF4444',
@@ -22,9 +23,10 @@ function threatStyle(feature?: Feature): PathOptions {
 }
 
 function ThreatZoneLayer() {
+  const isVisible = useMapStore((state) => state.activeLayers['L-03'] ?? true)
   const { data } = useLayerData<GeoJsonCollection<ThreatZoneProperties>>('L-03')
 
-  if (!data?.features?.length) return null
+  if (!isVisible || !data?.features?.length) return null
 
   return (
     <GeoJSON

@@ -2,6 +2,7 @@ import { CircleMarker, Popup } from 'react-leaflet'
 import { useLayerData } from '../../../hooks/useLayerData'
 import DPSPopup from '../DPSPopup'
 import type { GeoJsonCollection, FacilityProperties, IkeCategory } from '../../../types/gis'
+import { useMapStore } from '../../../store/mapStore'
 
 const IKE_COLORS: Record<IkeCategory, string> = {
   czerwony: '#EF4444',
@@ -16,9 +17,10 @@ function ikeColor(category: IkeCategory | null): string {
 }
 
 function DPSLayer() {
+  const isVisible = useMapStore((state) => state.activeLayers['L-01'] ?? true)
   const { data } = useLayerData<GeoJsonCollection<FacilityProperties>>('L-01')
 
-  if (!data?.features) return null
+  if (!isVisible || !data?.features) return null
 
   return data.features.map((feature) => {
     const [lng, lat] = feature.geometry.coordinates as [number, number]

@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Aktywne:** `1.7 — Mapa Leaflet z granicami i warstwą DPS`
+**Aktywne:** `1.8 — Panele boczne v1.0`
 
 ---
 
@@ -309,7 +309,7 @@ Manualne — przeglądarka http://localhost:5173:
 
 ---
 
-### ⬜ 1.8 — Panele boczne v1.0
+### ✅ 1.8 — Panele boczne v1.0
 
 **Pliki do stworzenia:**
 - `frontend/src/components/panels/LayerControlPanel.tsx`
