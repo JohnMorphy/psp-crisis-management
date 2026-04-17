@@ -35,8 +35,9 @@ operują na slugach. **Nie używaj form `M. Lublin`, `M. Chełm` w kolumnach `po
 4. [seed_transport.sql — zasoby transportowe](#4-seed_transportsql--zasoby-transportowe)
 5. [seed_layers.sql — konfiguracja warstw GIS](#5-seed_layerssql--konfiguracja-warstw-gis)
 6. [seed_strefy.sql — strefy zagrożeń (demo)](#6-seed_strefysql--strefy-zagrożeń-demo)
-7. [Pliki GeoJSON — granice administracyjne](#7-pliki-geojson--granice-administracyjne)
+7. [Pliki GeoJSON — granice administracyjne (legacy L-00)](#7-pliki-geojson--granice-administracyjne-legacy-l-00)
 8. [Konfiguracja IKE — ike.config.json](#8-konfiguracja-ike--ikeconfigjson)
+9. [Tabela granice_administracyjne — PRG WFS](#9-tabela-granice_administracyjne--prg-wfs)
 
 ---
 
@@ -201,6 +202,29 @@ CREATE TABLE IF NOT EXISTS biale_plamy (
     zrodlo VARCHAR(20)  DEFAULT 'syntetyczne'
 );
 CREATE INDEX IF NOT EXISTS idx_biale_plamy_geom ON biale_plamy USING GIST(geom);
+
+-- ============================================================
+-- TABELA: granice_administracyjne
+-- Wypełniana przez AdminBoundaryImportAgent z GUGiK PRG WFS.
+-- Import idempotentny: DELETE poziom + INSERT przy każdym wywołaniu importu.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS granice_administracyjne (
+    id              SERIAL PRIMARY KEY,
+    kod_teryt       VARCHAR(7)   UNIQUE NOT NULL,
+    -- Kody TERYT: WOJ=2 cyfry, POW=4 cyfry (2woj+2pow), GMI=7 cyfr (2woj+2pow+2gmi+1typ)
+    nazwa           VARCHAR(200) NOT NULL,
+    poziom          VARCHAR(12)  NOT NULL
+                    CHECK (poziom IN ('wojewodztwo', 'powiat', 'gmina')),
+    kod_nadrzedny   VARCHAR(6),
+    -- NULL dla województw; kod powiatu (4 cyfry) dla gmin; kod woj. (2 cyfry) dla powiatów
+    geom            GEOMETRY(MULTIPOLYGON, 4326) NOT NULL,
+    zrodlo          VARCHAR(20)  DEFAULT 'prg_wfs',
+    data_importu    TIMESTAMPTZ  DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_granice_poziom       ON granice_administracyjne(poziom);
+CREATE INDEX IF NOT EXISTS idx_granice_geom         ON granice_administracyjne USING GIST(geom);
+CREATE INDEX IF NOT EXISTS idx_granice_kod_teryt    ON granice_administracyjne(kod_teryt);
+CREATE INDEX IF NOT EXISTS idx_granice_kod_nadrz    ON granice_administracyjne(kod_nadrzedny);
 
 -- ============================================================
 -- TABELA: ike_results
@@ -671,8 +695,30 @@ VALUES
 ('L-07', 'Białe plamy transportowe',
  'BialePlamiLayer', 'Polygon', FALSE,
  '/api/layers/L-07', 3600, '#6B7280', 'map-off',
- 'Obszary bez regularnego transportu publicznego');
+ 'Obszary bez regularnego transportu publicznego'),
+
+-- Granice administracyjne całej Polski — dane z GUGiK PRG WFS (zadanie 1.9–1.11)
+-- Tabela granice_administracyjne wypełniana przez AdminBoundaryImportAgent.
+-- L-09 i L-10 wymagają filtra ?kod_woj= lub ?bbox= przy pobieraniu danych.
+('L-08', 'Granice województw',
+ 'AdminBoundaryLayer', 'MultiPolygon', TRUE,
+ '/api/layers/L-08', 86400, '#6366F1', 'map',
+ 'Granice 16 województw Polski — dane PRG GUGiK'),
+
+('L-09', 'Granice powiatów',
+ 'AdminBoundaryLayer', 'MultiPolygon', FALSE,
+ '/api/layers/L-09', 86400, '#4B5563', 'map',
+ 'Granice ~380 powiatów Polski — dane PRG GUGiK'),
+
+('L-10', 'Granice gmin',
+ 'AdminBoundaryLayer', 'MultiPolygon', FALSE,
+ '/api/layers/L-10', 86400, '#374151', 'map',
+ 'Granice ~2477 gmin Polski — dane PRG GUGiK (wymagany filtr kod_woj lub bbox)');
 ```
+
+> ⚠️ **L-00 (legacy):** warstwa administracyjna serwowana ze statycznego pliku GeoJSON
+> (tylko woj. lubelskie). Zastąpiona przez L-08/L-09/L-10. Pozostaje aktywna do czasu
+> zakończenia zadania 1.11 — po nim oznaczona `aktywna = FALSE`.
 
 ---
 
@@ -710,7 +756,10 @@ VALUES
 
 ---
 
-## 7. Pliki GeoJSON — granice administracyjne
+## 7. Pliki GeoJSON — granice administracyjne (legacy L-00)
+
+> **Status:** L-00 jest aktywne do czasu ukończenia zadania 1.11.
+> Po wdrożeniu L-08/L-09/L-10 (PRG WFS) zostanie oznaczone `aktywna = FALSE`.
 
 **Lokalizacja:** `backend/src/main/resources/geojson/`
 **Serwowane przez:** `GeoService.java` → `GET /api/layers/L-00` (granice)
@@ -720,6 +769,9 @@ VALUES
 > statycznymi serwowanymi z pliku GeoJSON, nie z bazy — nie podlegają odświeżaniu
 > przez WebSocket i nie mają rekordu w `layer_config`. Frontend traktuje `L-00`
 > jako osobne żądanie inicjalizacyjne, niezależne od listy `GET /api/layers`.
+>
+> Docelowe zastąpienie: `L-08` (województwa), `L-09` (powiaty), `L-10` (gminy)
+> serwowane z tabeli `granice_administracyjne` — patrz §9.
 
 ### Pobranie z GADM 4.1
 
@@ -796,3 +848,58 @@ EOF
 ```
 
 Pełny opis algorytmu i edge case'ów: `documentation/IKE_ALGORITHM.md`.
+
+---
+
+## 9. Tabela `granice_administracyjne` — PRG WFS
+
+**Implementacja:** zadania 1.9 (import) + 1.10 (API) + 1.11 (frontend)
+
+### Źródło danych — GUGiK PRG WFS
+
+```
+Serwis: https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WFS/AdministrativeDivision
+Protokół: WFS 2.0.0
+Format wyjściowy: GML (domyślny) — konwersja GML→JTS przez GeoTools
+CRS źródłowy: EPSG:2180 (PUWG 1992)
+CRS docelowy: EPSG:4326 (WGS 84) — transformacja w AdminBoundaryImportAgent
+
+Warstwy:
+  TypeName: ms:A02_Granice_Wojewodztw   → poziom = 'wojewodztwo'  (16 rekordów)
+  TypeName: ms:A03_Granice_Powiatow     → poziom = 'powiat'       (~380 rekordów)
+  TypeName: ms:A04_Granice_Gmin         → poziom = 'gmina'        (~2477 rekordów)
+
+Przykładowe żądanie GetFeature:
+  GET {URL}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature
+           &TYPENAMES=ms:A02_Granice_Wojewodztw&COUNT=100
+```
+
+> ⚠️ Typowe pole TERYT w PRG: `JPT_KOD_JE` (kod TERYT) i `JPT_NAZWA_` (nazwa).
+> Pola mogą się różnić między wersjami serwisu — weryfikuj przy implementacji
+> przez `GetCapabilities` / `DescribeFeatureType`.
+
+### Kody TERYT — konwencja
+
+| Poziom | Długość | Przykład | Znaczenie |
+|---|---|---|---|
+| Województwo | 2 | `06` | Lubelskie |
+| Powiat | 4 | `0601` | m. Lublin |
+| Gmina | 7 | `0601011` | Lublin (gm. miejska) |
+
+`kod_nadrzedny`:
+- Województwo → `NULL`
+- Powiat → pierwsze 2 znaki `kod_teryt` (kod województwa)
+- Gmina → pierwsze 4 znaki `kod_teryt` (kod powiatu)
+
+### Wydajność i ograniczenia
+
+| Poziom | Liczba features | Rozmiar GeoJSON (est.) | Uwagi |
+|---|---|---|---|
+| Województwo | 16 | ~2 MB | Brak ograniczeń |
+| Powiat | ~380 | ~40 MB | OK bez filtra |
+| Gmina | ~2477 | ~250 MB | **Wymagany filtr** `?kod_woj=` lub `?bbox=` |
+
+Potencjalne usprawnienie (DT — nie implementuj teraz): dwie geometrie per rekord —
+`geom` (pełna, do PostGIS ST_Intersects) + `geom_uproszczona`
+(ST_Simplify tolerance=0.001°, ~100m) do serwowania frontendowi.
+Szacunkowa redukcja rozmiaru GeoJSON dla gmin: ~60–70%.

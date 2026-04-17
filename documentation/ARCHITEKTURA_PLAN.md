@@ -146,13 +146,16 @@ volumes:
 │  Controllers                                                  │
 │  ├── ThreatController   POST /api/threat/flood/import        │
 │  │                      POST /api/threat/clear               │
-│  ├── GeoController      GET  /api/layers/{id}                │
+│  ├── GeoController      GET  /api/layers/{id} (L-01…L-10)   │
+│  ├── AdminBoundaryController POST /api/admin-boundaries/import│
 │  ├── IkeController      GET  /api/ike                        │
 │  ├── DecisionController GET  /api/decisions                  │
 │  └── KalkulatorController POST /api/calculate/*              │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐     │
 │  │           Decision Layer (Agents)                    │     │
+│  │                                                      │     │
+│  │  AdminBoundaryImportAgent (PRG WFS → granice_adm.)  │     │
 │  │                                                      │     │
 │  │  FloodImportAgent ──publishes──► ThreatUpdatedEvent  │     │
 │  │                                         │            │     │
@@ -366,7 +369,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │   ├── MapContainer.tsx
 │       │   │   ├── MapControls.tsx
 │       │   │   ├── LayerManager.tsx
-│       │   │   ├── AdminBoundaries.tsx
+│       │   │   ├── AdminBoundaries.tsx         # @deprecated — zastąpiony przez AdminBoundaryLayer
 │       │   │   ├── DPSPopup.tsx
 │       │   │   ├── EvacuationRoute.tsx
 │       │   │   └── layers/
@@ -376,7 +379,8 @@ Działanie po IkeRecalculatedEvent:
 │       │   │       ├── DrogiLayer.tsx
 │       │   │       ├── TransportLayer.tsx
 │       │   │       ├── RelokacjaLayer.tsx
-│       │   │       └── BialePlamiLayer.tsx
+│       │   │       ├── BialePlamiLayer.tsx
+│       │   │       └── AdminBoundaryLayer.tsx  # ★ L-08/L-09/L-10 — 3 poziomy admin
 │       │   │
 │       │   ├── panels/
 │       │   │   ├── ScenarioPanel.tsx       # ★ wybór scenariusza zagrożenia
@@ -406,6 +410,7 @@ Działanie po IkeRecalculatedEvent:
 │       │
 │       ├── hooks/
 │       │   ├── useLayerData.ts
+│       │   ├── useAdminBoundaries.ts           # ★ hook dla L-08/L-09/L-10 z filtrem
 │       │   ├── useWebSocket.ts
 │       │   ├── useFilters.ts
 │       │   └── useVoiceCommands.ts
@@ -436,7 +441,8 @@ Działanie po IkeRecalculatedEvent:
 │       │   ├── agent/                           # ★ warstwa agentowa
 │       │   │   ├── FloodImportAgent.java        # import WFS → publikacja ThreatUpdatedEvent
 │       │   │   ├── IkeAgent.java               # @EventListener → obliczanie IKE
-│       │   │   └── DecisionAgent.java          # @EventListener → rekomendacje
+│       │   │   ├── DecisionAgent.java          # @EventListener → rekomendacje
+│       │   │   └── AdminBoundaryImportAgent.java# ★ import granic z GUGiK PRG WFS
 │       │   │
 │       │   ├── config/
 │       │   │   ├── AsyncConfig.java            # ★ konfiguracja @Async (pula wątków)
@@ -446,7 +452,8 @@ Działanie po IkeRecalculatedEvent:
 │       │   │
 │       │   ├── controller/
 │       │   │   ├── ThreatController.java       # ★ POST /api/threat/*
-│       │   │   ├── GeoController.java
+│       │   │   ├── GeoController.java          # GET /api/layers/{id} L-01…L-10
+│       │   │   ├── AdminBoundaryController.java# ★ POST /api/admin-boundaries/import
 │       │   │   ├── LayerConfigController.java
 │       │   │   ├── IkeController.java
 │       │   │   ├── DecisionController.java     # ★ GET /api/decisions
@@ -455,6 +462,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │
 │       │   ├── service/
 │       │   │   ├── GeoService.java
+│       │   │   ├── AdminBoundaryService.java   # ★ zapytania do granice_administracyjne
 │       │   │   ├── LiveFeedService.java        # @EventListener → WebSocket push
 │       │   │   ├── KalkulatorService.java
 │       │   │   ├── ScraperService.java
@@ -465,6 +473,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │
 │       │   ├── repository/
 │       │   │   ├── PlacowkaRepository.java
+│       │   │   ├── GranicaAdministracyjnaRepository.java# ★ granice_administracyjne
 │       │   │   ├── StrefaZagrozenRepository.java
 │       │   │   ├── IkeResultRepository.java
 │       │   │   ├── EvacuationDecisionRepository.java
@@ -473,6 +482,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │   └── TransportRepository.java
 │       │   │
 │       │   ├── model/
+│       │   │   ├── GranicaAdministracyjna.java # ★ encja granice_administracyjne
 │       │   │   ├── Placowka.java
 │       │   │   ├── StrefaZagrozen.java
 │       │   │   ├── IkeResult.java
@@ -583,7 +593,8 @@ ALTER TABLE strefy_zagrozen
 | OpenStreetMap / Leaflet | Podkład mapowy | Brak |
 | Nominatim (OSM) | Geokodowanie | Brak |
 | OSRM (public) | Trasy ewakuacji | Brak |
-| GADM 4.1 / GUGiK | GeoJSON granic | Brak (open data) |
+| GADM 4.1 | GeoJSON granic (legacy L-00) | Brak (open data) |
+| **GUGiK PRG WFS** | **Granice administracyjne całej Polski (L-08/L-09/L-10)** | **Brak (publiczny WFS)** |
 | ISOK / RZGW Hydroportal | WFS dane powodziowe | Brak (publiczny WFS) |
 | Web Speech API | Asystent głosowy | Brak |
 | Whisper API (OpenAI) | Fallback głosowy | `OPENAI_API_KEY` |
@@ -616,3 +627,6 @@ Poniżej wyłącznie cele iteracji (co i dlaczego), bez listy kroków:
 | Race condition: DecisionAgent czyta IKE zanim IkeAgent skończy | DecisionAgent słucha `IkeRecalculatedEvent`, nie `ThreatUpdatedEvent` |
 | PostGIS wolne przy dużej liczbie placówek | Indeksy GiST; batch processing w IkeAgent |
 | GML z WFS w nieoczekiwanym układzie EPSG | Zawsze jawna transformacja w `WfsClientService` przed zapisem |
+| PRG WFS niedostępny / zmienia schemat TypeName | Weryfikacja przez `GetCapabilities`; w przypadku błędu — 503 z instrukcją ręcznego importu |
+| L-10 (gminy ~2477) zbyt wolne bez uproszczenia geometrii | Wymagany filtr `kod_woj` lub `bbox`; potencjalne ST_Simplify jako DT |
+| PRG WFS zwraca GML w paginacji (maxFeatures) | Implementacja pętli z `startIndex` w `AdminBoundaryImportAgent` |

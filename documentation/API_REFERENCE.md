@@ -45,7 +45,8 @@
 | `POST` | `/api/threat/flood/import` | Import danych WFS + publikacja ThreatUpdatedEvent | v1.1 |
 | `POST` | `/api/threat/clear` | Wyczyszczenie stref + publikacja ThreatUpdatedEvent | v1.1 |
 | `GET` | `/api/layers` | Lista konfiguracji warstw | v1.0 |
-| `GET` | `/api/layers/{id}` | Dane GeoJSON warstwy | v1.0 |
+| `GET` | `/api/layers/{id}` | Dane GeoJSON warstwy (L-01…L-10) | v1.0 |
+| `POST` | `/api/admin-boundaries/import` | Import granic z GUGiK PRG WFS | v1.0 |
 | `GET` | `/api/ike` | Wyniki IKE dla wszystkich placówek | v1.0 |
 | `GET` | `/api/ike/{kod}` | Wynik IKE dla jednej placówki | v1.0 |
 | `POST` | `/api/ike/recalculate` | Wymuszenie przeliczenia (admin) | v1.1 |
@@ -172,17 +173,58 @@ Lista konfiguracji wszystkich aktywnych warstw GIS.
 
 ---
 
+### `POST /api/admin-boundaries/import`
+
+Uruchamia `AdminBoundaryImportAgent`: pobiera granice z GUGiK PRG WFS dla wszystkich
+trzech poziomów (województwo, powiat, gmina) i zapisuje do tabeli `granice_administracyjne`.
+
+**Operacja asynchroniczna** — zwraca `202 Accepted` natychmiast. Import trwa ~2–5 minut.
+
+**Body:** brak
+
+**Response 202 Accepted:**
+
+```json
+{
+  "status": "started",
+  "poziomy": ["wojewodztwo", "powiat", "gmina"],
+  "correlation_id": "a1b2c3d4-..."
+}
+```
+
+**Response 409 (import już trwa):**
+
+```json
+{
+  "error": "Import granic jest już w toku",
+  "code": "IMPORT_IN_PROGRESS",
+  "timestamp": "2026-04-14T09:00:00Z"
+}
+```
+
+---
+
 ### `GET /api/layers/{id}`
 
-Dane GeoJSON jednej warstwy. `{id}` = `L-01` … `L-07`.
+Dane GeoJSON jednej warstwy. `{id}` = `L-01` … `L-10`.
 
-**Query params (opcjonalne):**
+**Query params — warstwy L-01…L-07 (opcjonalne):**
 
 | Param | Typ | Opis |
 |---|---|---|
 | `powiat` | string | Filtruj do powiatu |
 | `gmina` | string | Filtruj do gminy |
 | `bbox` | string | `lon_min,lat_min,lon_max,lat_max` |
+
+**Query params — warstwy granic administracyjnych L-08…L-10:**
+
+| Param | Wymagane dla | Opis |
+|---|---|---|
+| `kod_woj` | L-09 (zalecane), L-10 (wymagane) | 2-znakowy kod TERYT województwa, np. `06` |
+| `bbox` | L-10 (alternatywa dla `kod_woj`) | `lon_min,lat_min,lon_max,lat_max` |
+
+> L-10 bez `kod_woj` ani `bbox` zwraca **400** `FILTER_REQUIRED`
+> (zbyt duży zbiór danych — ~2477 geometrii bez uproszczenia).
 
 **Response 200 — warstwa L-01 (fragment):**
 

@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Aktywne:** `1.8 — Panele boczne v1.0`
+**Aktywne:** `— (ustaw przed startem sesji)`
 
 ---
 
@@ -335,6 +335,216 @@ Manualne:
 ```
 
 **Commit:** `feat(1.8): LayerControlPanel + RegionInfoPanel + Zustand mapStore`
+
+---
+
+### ⬜ 1.9 — Tabela granice_administracyjne + AdminBoundaryImportAgent (PRG WFS)
+
+**Pliki do stworzenia / modyfikacji:**
+- `backend/src/main/resources/db/schema.sql` (dodaj tabelę `granice_administracyjne`)
+- `backend/.../model/GranicaAdministracyjna.java`
+- `backend/.../repository/GranicaAdministracyjnaRepository.java`
+- `backend/.../agent/AdminBoundaryImportAgent.java`
+- `backend/.../controller/AdminBoundaryController.java`
+
+**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (§1 — nowa tabela, §9), `documentation/API_REFERENCE.md` (`POST /api/admin-boundaries/import`)
+
+**Opis:**
+
+Nowa tabela `granice_administracyjne` przechowuje granice administracyjne całej Polski
+na trzech poziomach: województwo (16), powiat (~380), gmina (~2500).
+Źródłem danych jest **GUGiK PRG WFS** (Państwowy Rejestr Granic):
+
+```
+URL: https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WFS/AdministrativeDivision
+TypeName poziomów:
+  ms:A02_Granice_Wojewodztw   → poziom 'wojewodztwo'
+  ms:A03_Granice_Powiatow     → poziom 'powiat'
+  ms:A04_Granice_Gmin         → poziom 'gmina'
+CRS źródłowy: EPSG:2180 (PUWG 1992) — transformacja do EPSG:4326 przez GeoTools
+```
+
+`AdminBoundaryImportAgent` to zwykły `@Service` wywoływany synchronicznie przez kontroler
+(import trwa ~2-5 min — odpowiedź 202, agent działa w osobnym wątku `@Async`).
+Kolejność importu: najpierw województwa, potem powiaty, potem gminy.
+Import jest idempotentny: przed zapisem usuwa istniejące rekordy danego `poziom`.
+
+**Nie implementuj** w tym zadaniu endpointów GET dla danych granic — to zadanie 1.10.
+
+`POST /api/admin-boundaries/import` zwraca 202 z body:
+```json
+{ "status": "started", "poziomy": ["wojewodztwo", "powiat", "gmina"], "correlation_id": "..." }
+```
+
+**Weryfikacja:**
+```bash
+./mvnw compile -q
+
+# Uruchom import (trwa kilka minut)
+curl -s -X POST http://localhost:8080/api/admin-boundaries/import | jq .status
+# oczekiwane: "started"
+
+sleep 300  # poczekaj na zakończenie
+
+# Sprawdź wyniki
+docker compose exec postgres psql -U lublin -d gis_dashboard \
+  -c "SELECT poziom, COUNT(*) FROM granice_administracyjne GROUP BY poziom ORDER BY poziom;"
+# oczekiwane:
+#  gmina        | ~2477
+#  powiat        | ~380
+#  wojewodztwo   | 16
+
+# Sprawdź SRID i geometrię
+docker compose exec postgres psql -U lublin -d gis_dashboard \
+  -c "SELECT ST_SRID(geom), ST_AsText(ST_Centroid(geom)) FROM granice_administracyjne
+      WHERE poziom='wojewodztwo' AND nazwa ILIKE '%lubel%';"
+# SRID: 4326, centroid w okolicach (22-23°E, 51°N)
+```
+
+**Potencjalne usprawnienia (dług techniczny — nie implementuj teraz):**
+- Podwójna geometria: `geom` (pełna) + `geom_uproszczona` (ST_Simplify ~100m) dla wydajności frontendu
+- `@Scheduled` roczny autorefresh granic
+
+**Commit:** `feat(1.9): granice_administracyjne + AdminBoundaryImportAgent (PRG WFS)`
+
+---
+
+### ⬜ 1.10 — API: warstwy L-08/L-09/L-10 (granice administracyjne całej Polski)
+
+**Pliki do stworzenia / modyfikacji:**
+- `backend/.../service/AdminBoundaryService.java`
+- `backend/.../controller/GeoController.java` (rozszerzenie obsługi L-08, L-09, L-10)
+- `backend/src/main/resources/db/seed_layers.sql` (dodaj L-08, L-09, L-10)
+
+**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (§5 — seed_layers, §9), `documentation/API_REFERENCE.md` (`GET /api/layers/{id}`)
+
+**Opis:**
+
+Trzy nowe warstwy w `layer_config`:
+
+| ID | Poziom | Domyślnie | Opis |
+|---|---|---|---|
+| `L-08` | `wojewodztwo` | ✅ włączona | 16 granic województw |
+| `L-09` | `powiat` | ❌ wyłączona | ~380 granic powiatów |
+| `L-10` | `gmina` | ❌ wyłączona | ~2477 granic gmin |
+
+`AdminBoundaryService` odpowiada za zapytania do `granice_administracyjne`:
+- `GET /api/layers/L-08` → wszystkie województwa (brak filtrów, zawsze 16 features)
+- `GET /api/layers/L-09` → powiaty; opcjonalny `?kod_woj=06` filtruje do województwa (zalecane przy dużych zbiorach)
+- `GET /api/layers/L-10` → gminy; **wymagany** `?kod_woj=XX` lub `?bbox=...` — bez filtra zwróć 400 z `FILTER_REQUIRED`
+
+Każda feature w FeatureCollection zawiera properties:
+```json
+{
+  "kod_teryt": "0601011",
+  "nazwa": "Lublin",
+  "poziom": "gmina",
+  "kod_nadrzedny": "0601"
+}
+```
+
+Rozszerz istniejący `GeoController.getLayerById()` o delegację do `AdminBoundaryService`
+dla ID `L-08`, `L-09`, `L-10`. Zachowaj istniejącą obsługę L-00…L-07 bez zmian.
+
+Operacja PostGIS do filtrowania po bbox:
+```sql
+WHERE poziom = :poziom
+AND (:bbox IS NULL OR ST_Intersects(geom, ST_MakeEnvelope(:xmin,:ymin,:xmax,:ymax,4326)))
+AND (:kod_woj IS NULL OR LEFT(kod_teryt, 2) = :kod_woj)
+```
+
+**Weryfikacja:**
+```bash
+# Lista warstw — powinna pokazać 10 pozycji (7 + 3 nowe)
+curl -s http://localhost:8080/api/layers | jq '. | length'
+# oczekiwane: 10
+
+# Województwa — 16 features
+curl -s http://localhost:8080/api/layers/L-08 | jq '.feature_count'
+# oczekiwane: 16
+
+# Powiaty z filtrem województwa lubelskiego (kod 06)
+curl -s "http://localhost:8080/api/layers/L-09?kod_woj=06" | jq '.feature_count'
+# oczekiwane: 24 (powiaty woj. lubelskiego)
+
+# Gminy bez filtra — powinno zwrócić błąd
+curl -s http://localhost:8080/api/layers/L-10 | jq .code
+# oczekiwane: "FILTER_REQUIRED"
+
+# Gminy z filtrem
+curl -s "http://localhost:8080/api/layers/L-10?kod_woj=06" | jq '.feature_count'
+# oczekiwane: ~213 (gminy woj. lubelskiego)
+
+# properties jednej cechy
+curl -s http://localhost:8080/api/layers/L-08 | jq '.features[0].properties'
+# oczekiwane: obiekt z kod_teryt, nazwa, poziom, kod_nadrzedny
+```
+
+**Commit:** `feat(1.10): AdminBoundaryService + GET /api/layers/L-08,L-09,L-10`
+
+---
+
+### ⬜ 1.11 — Frontend: AdminBoundaryLayer wielopoziomowy + RegionInfoPanel update
+
+**Pliki do stworzenia / modyfikacji:**
+- `frontend/src/components/map/layers/AdminBoundaryLayer.tsx` (nowy, zastępuje AdminBoundaries.tsx)
+- `frontend/src/components/map/MapContainer.tsx` (zamień AdminBoundaries → AdminBoundaryLayer)
+- `frontend/src/store/mapStore.ts` (L-08: true, L-09: false, L-10: false)
+- `frontend/src/components/panels/RegionInfoPanel.tsx` (dodaj kod TERYT, obsługa spoza Lubelskiego)
+- `frontend/src/hooks/useAdminBoundaries.ts` (hook z logiką filtrowania)
+
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory), `documentation/API_REFERENCE.md` (`GET /api/layers/L-08`, `L-09`, `L-10`)
+
+**Opis:**
+
+`AdminBoundaryLayer` renderuje trzy niezależne warstwy Leaflet GeoJSON — po jednej
+na każdy poziom administracyjny. Widoczność każdej kontrolowana przez `activeLayers`
+w Zustand store.
+
+Styl warstw:
+```
+L-08 województwa:  kolor #6366F1, weight 2, fillOpacity 0.04
+L-09 powiaty:      kolor #4B5563, weight 1, fillOpacity 0.03
+L-10 gminy:        kolor #374151, weight 0.5, fillOpacity 0.02
+```
+
+Przy kliknięciu regionu — niezależnie od poziomu — wyświetlany styl:
+```
+kolor #60A5FA, weight 2.5, fillOpacity 0.15
+```
+oraz zapis do `setSelectedRegion({ name: feature.properties.nazwa, kod_teryt: feature.properties.kod_teryt, poziom: feature.properties.poziom, properties: ... })`.
+
+`useAdminBoundaries(poziom, kodWoj?)` — hook opakowujący `useLayerData` z dynamicznym
+queryKey uwzględniającym filtr `kod_woj`. L-10 zawsze wymaga `kod_woj`.
+
+`RegionInfoPanel` — rozszerzenie:
+- Wyświetl `kod_teryt` i `poziom` dla każdego regionu
+- Gdy powiat/gmina poza woj. lubelskim: wyświetl nazwę + TERYT + tekst
+  „Brak danych placówek dla tego regionu"
+- Gdy powiat/gmina woj. lubelskiego (`kod_teryt` zaczyna się od `06`):
+  statystyki placówek jak dotychczas
+
+**Nie usuwaj** `AdminBoundaries.tsx` — oznacz go jako `@deprecated` w komentarzu
+na górze pliku. Usunięcie planowane po zakończeniu zadania 1.11.
+
+**Weryfikacja:**
+```
+Manualne — przeglądarka http://localhost:5173:
+☐ Przy starcie widoczne tylko granice województw (L-08 domyślnie włączona)
+☐ Włączenie L-09 → pojawiają się granice powiatów
+☐ Włączenie L-10 → pojawiają się granice gmin (może być wolne — to OK)
+☐ Kliknięcie województwa → RegionInfoPanel: nazwa + TERYT 2-znakowy
+☐ Kliknięcie powiatu lubelskiego → statystyki DPS w panelu
+☐ Kliknięcie powiatu mazowieckiego → "Brak danych placówek dla tego regionu"
+☐ Wyłączenie L-09 → granice powiatów znikają z mapy
+☐ npm run build → 0 błędów TypeScript
+```
+
+**Potencjalne usprawnienia (dług techniczny — nie implementuj teraz):**
+- Lazy loading: L-09 i L-10 ładuj dopiero po włączeniu toggle (useLayerData z `enabled: isActive`)
+- Uproszczone geometrie (`geom_uproszczona`) gdy gminy będą zbyt wolne
+
+**Commit:** `feat(1.11): AdminBoundaryLayer wielopoziomowy + RegionInfoPanel TERYT`
 
 ---
 
