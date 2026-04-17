@@ -4,6 +4,8 @@ type ActiveLayers = Record<string, boolean>;
 
 export type SelectedRegion = {
   name: string;
+  kod_teryt?: string;
+  poziom?: string;
   properties: Record<string, unknown>;
 } | null;
 
@@ -21,6 +23,9 @@ export const useMapStore = create<MapStore>()((set) => ({
     "L-00": true,
     "L-01": true,
     "L-03": true,
+    "L-08": true,
+    "L-09": false,
+    "L-10": false,
   },
   toggleLayer: (id, value) =>
     set((state) => ({

@@ -28,6 +28,7 @@ function LayerControlPanel() {
       )}
 
       {layers.map((layer) => {
+        debugger
         const isActive = activeLayers[layer.id] ?? layer.domyslnie_wlaczona
 
         return (

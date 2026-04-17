@@ -484,7 +484,7 @@ curl -s http://localhost:8080/api/layers/L-08 | jq '.features[0].properties'
 
 ---
 
-### ⬜ 1.11 — Frontend: AdminBoundaryLayer wielopoziomowy + RegionInfoPanel update
+### ✅ 1.11 — Frontend: AdminBoundaryLayer wielopoziomowy + RegionInfoPanel update
 
 **Pliki do stworzenia / modyfikacji:**
 - `frontend/src/components/map/layers/AdminBoundaryLayer.tsx` (nowy, zastępuje AdminBoundaries.tsx)

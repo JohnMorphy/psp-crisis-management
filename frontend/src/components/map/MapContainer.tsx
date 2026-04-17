@@ -1,6 +1,6 @@
 import { MapContainer as LeafletMapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import AdminBoundaries from './AdminBoundaries'
+import AdminBoundaryLayer from './layers/AdminBoundaryLayer'
 import DPSLayer from './layers/DPSLayer'
 import ThreatZoneLayer from './layers/ThreatZoneLayer'
 
@@ -18,7 +18,7 @@ function MapContainer() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      <AdminBoundaries />
+      <AdminBoundaryLayer />
       <ThreatZoneLayer />
       <DPSLayer />
     </LeafletMapContainer>
