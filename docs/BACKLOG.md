@@ -1,7 +1,7 @@
 # BACKLOG.md — Plan implementacji
 
 > Jedyne źródło prawdy dla zadań agentowych.
-> `documentation/ARCHITEKTURA_PLAN.md` opisuje *co* i *dlaczego*. Ten plik opisuje *jak* i *kiedy*.
+> `docs/ARCHITEKTURA_PLAN.md` opisuje *co* i *dlaczego*. Ten plik opisuje *jak* i *kiedy*.
 >
 > **Przed każdą sesją:** przeczytaj sekcję "Aktywne zadanie", zaimplementuj, zweryfikuj,
 > zrób commit, zmień status na ✅, zakończ sesję.
@@ -49,7 +49,7 @@ Deliverable: `curl http://localhost:8080/api/layers` zwraca 7 warstw,
 - `backend/src/main/resources/db/seed_strefy.sql`
 - `.env.example`
 
-**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (sekcje 1–6), `documentation/DEPLOYMENT.md` (sekcje 1–3)
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (sekcje 1–6), `docs/DEPLOYMENT.md` (sekcje 1–3)
 
 **Opis:**
 Uruchom PostgreSQL 15 + PostGIS w Dockerze. Stwórz schemat SQL ze wszystkimi tabelami
@@ -88,7 +88,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT ST_AsTex
 - `backend/src/main/java/pl/lublin/dashboard/config/DataSourceConfig.java`
 - `backend/src/main/java/pl/lublin/dashboard/config/CorsConfig.java`
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (sekcje 1, 6), `documentation/DEPLOYMENT.md` (§10)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (sekcje 1, 6), `docs/DEPLOYMENT.md` (§10)
 
 **Opis:**
 Spring Boot 3.x, OpenJDK 21. Zależności Maven: `spring-boot-starter-web`,
@@ -156,7 +156,7 @@ npm run dev
 - `backend/.../repository/LayerConfigRepository.java`
 - `backend/.../repository/StrefaZagrozenRepository.java`
 
-**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (§1 — DDL każdej tabeli)
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§1 — DDL każdej tabeli)
 
 **Opis:**
 Encje JPA mapowane na tabele z `schema.sql`. Geometrie przez Hibernate Spatial
@@ -193,7 +193,7 @@ start-dev.cmd (uruchamia docker-compose.yml)
 - `backend/src/main/resources/geojson/lublin_powiaty.geojson`
 - `backend/src/main/resources/geojson/lublin_gminy.geojson`
 
-**Dokumenty referencyjne:** `documentation/API_REFERENCE.md` (`GET /api/layers`, `GET /api/layers/{id}`), `documentation/DATA_SCHEMA.md` (§7)
+**Dokumenty referencyjne:** `docs/API_REFERENCE.md` (`GET /api/layers`, `GET /api/layers/{id}`), `docs/DATA_SCHEMA.md` (§7)
 
 **Opis:**
 `GeoService` ładuje GeoJSON granic z classpath (`geojson/`). `GeoController` serwuje:
@@ -234,7 +234,7 @@ curl -s http://localhost:8080/api/layers/L-99 | jq .code
 - `backend/.../model/IkeResult.java`
 - `backend/.../repository/IkeResultRepository.java`
 
-**Dokumenty referencyjne:** `documentation/IKE_ALGORITHM.md` (cały dokument), `documentation/DATA_SCHEMA.md` (§8), `documentation/API_REFERENCE.md` (`GET /api/ike`, `GET /api/ike/{kod}`, `GET /api/ike/config`)
+**Dokumenty referencyjne:** `docs/IKE_ALGORITHM.md` (cały dokument), `docs/DATA_SCHEMA.md` (§8), `docs/API_REFERENCE.md` (`GET /api/ike`, `GET /api/ike/{kod}`, `GET /api/ike/config`)
 
 **Opis:**
 W v1.0 `IkeAgent` jest zwykłym `@Service` wywoływanym synchronicznie przez kontroler
@@ -282,7 +282,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 - `frontend/src/components/map/DPSPopup.tsx`
 - `frontend/src/hooks/useLayerData.ts`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup DPS, kolory IKE), `documentation/API_REFERENCE.md` (`GET /api/layers/{id}`)
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup DPS, kolory IKE), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
 
 **Opis:**
 `MapContainer` — React-Leaflet, viewport Lublin (51.25, 22.57, zoom 9), podkład OSM.
@@ -316,7 +316,7 @@ Manualne — przeglądarka http://localhost:5173:
 - `frontend/src/components/panels/RegionInfoPanel.tsx`
 - `frontend/src/store/mapStore.ts`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout aplikacji), `documentation/API_REFERENCE.md` (`GET /api/layers`)
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout aplikacji), `docs/API_REFERENCE.md` (`GET /api/layers`)
 
 **Opis:**
 `LayerControlPanel` — lista warstw z `GET /api/layers`, toggle włącz/wyłącz każdą,
@@ -338,16 +338,16 @@ Manualne:
 
 ---
 
-### ⬜ 1.9 — Tabela granice_administracyjne + AdminBoundaryImportAgent (PRG WFS)
+### ✅ 1.9 — Tabela granice_administracyjne + AdminBoundaryImportAgent (PRG WFS)
 
 **Pliki do stworzenia / modyfikacji:**
 - `backend/src/main/resources/db/schema.sql` (dodaj tabelę `granice_administracyjne`)
-- `backend/.../model/AdministrativeBoudries.java`
-- `backend/.../repository/AdministrativeBoudriesRepository.java`
+- `backend/.../model/AdminBoundaryBoudries.java`
+- `backend/.../repository/AdminBoundaryRepository.java`
 - `backend/.../agent/AdminBoundaryImportAgent.java`
 - `backend/.../controller/AdminBoundaryController.java`
 
-**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (§1 — nowa tabela, §9), `documentation/API_REFERENCE.md` (`POST /api/admin-boundaries/import`)
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§1 — nowa tabela, §9), `docs/API_REFERENCE.md` (`POST /api/admin-boundaries/import`)
 
 **Opis:**
 
@@ -416,7 +416,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 - `backend/.../controller/GeoController.java` (rozszerzenie obsługi L-08, L-09, L-10)
 - `backend/src/main/resources/db/seed_layers.sql` (dodaj L-08, L-09, L-10)
 
-**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (§5 — seed_layers, §9), `documentation/API_REFERENCE.md` (`GET /api/layers/{id}`)
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§5 — seed_layers, §9), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
 
 **Opis:**
 
@@ -493,7 +493,7 @@ curl -s http://localhost:8080/api/layers/L-08 | jq '.features[0].properties'
 - `frontend/src/components/panels/RegionInfoPanel.tsx` (dodaj kod TERYT, obsługa spoza Lubelskiego)
 - `frontend/src/hooks/useAdminBoundaries.ts` (hook z logiką filtrowania)
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory), `documentation/API_REFERENCE.md` (`GET /api/layers/L-08`, `L-09`, `L-10`)
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory), `docs/API_REFERENCE.md` (`GET /api/layers/L-08`, `L-09`, `L-10`)
 
 **Opis:**
 
@@ -566,7 +566,7 @@ aktualizuje się automatycznie w ciągu 30 sekund bez odświeżenia strony.
 - `backend/.../event/IkeResultSummary.java`
 - `backend/.../config/AsyncConfig.java`
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (§4.1, §4.1a, §6)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.1, §4.1a, §6)
 
 **Opis:**
 `ThreatUpdatedEvent` i `IkeRecalculatedEvent` dokładnie jak w `ARCHITEKTURA_PLAN.md` §4.1 i §4.1a.
@@ -589,7 +589,7 @@ aktualizuje się automatycznie w ciągu 30 sekund bez odświeżenia strony.
 **Pliki do modyfikacji:**
 - `backend/.../agent/IkeAgent.java` — zmiana z `@Service` na `@EventListener @Async`
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (§4.3), `documentation/IKE_ALGORITHM.md` (§2, §11)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.3), `docs/IKE_ALGORITHM.md` (§2, §11)
 
 **Opis:**
 Refaktoruj `IkeAgent` z v1.0 (synchroniczny `@Service`) na event-driven listener.
@@ -638,7 +638,7 @@ curl -s -X POST http://localhost:8080/api/ike/recalculate | jq .code
 - `backend/.../repository/EvacuationDecisionRepository.java`
 - `backend/.../controller/DecisionController.java`
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (§4.4, §7), `documentation/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.4, §7), `docs/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
 
 **Opis:**
 `DecisionAgent` słucha `IkeRecalculatedEvent` (nie `ThreatUpdatedEvent`).
@@ -684,7 +684,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 - `backend/.../agent/FloodImportAgent.java` (stub — tylko syntetyczne strefy, bez WFS)
 - `backend/.../controller/ThreatController.java`
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (§4.2), `documentation/API_REFERENCE.md` (`POST /api/threat/flood/import`, `POST /api/threat/clear`), `documentation/DATA_SCHEMA.md` (tabela `strefy_zagrozen`)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.2), `docs/API_REFERENCE.md` (`POST /api/threat/flood/import`, `POST /api/threat/clear`), `docs/DATA_SCHEMA.md` (tabela `strefy_zagrozen`)
 
 **Opis:**
 W v1.1 `FloodImportAgent` generuje syntetyczne strefy (prostokąty wzdłuż bbox powiatu)
@@ -730,7 +730,7 @@ curl -s "http://localhost:8080/api/ike?kategoria=czerwony" | jq '.liczba_wynikow
 - `backend/.../config/WebSocketConfig.java`
 - `backend/.../service/LiveFeedService.java`
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (§4.5, §8), `documentation/API_REFERENCE.md` (sekcja WebSocket)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.5, §8), `docs/API_REFERENCE.md` (sekcja WebSocket)
 
 **Opis:**
 `WebSocketConfig` — STOMP over SockJS, endpoint `/ws`, broker `/topic`.
@@ -767,7 +767,7 @@ curl -s -X POST http://localhost:8080/api/threat/flood/import \
 - `frontend/src/hooks/useWebSocket.ts`
 - `frontend/src/components/panels/ScenarioPanel.tsx`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout — ScenarioPanel), `documentation/API_REFERENCE.md` (sekcja WebSocket, `POST /api/threat/flood/import`)
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout — ScenarioPanel), `docs/API_REFERENCE.md` (sekcja WebSocket, `POST /api/threat/flood/import`)
 
 **Opis:**
 `websocketService.ts` — SockJS + `@stomp/stompjs`, reconnect 5s.
@@ -804,7 +804,7 @@ Manualne — przeglądarka http://localhost:5173:
 - `frontend/src/utils/colorScale.ts`
 - `frontend/src/components/shared/IKEScore.tsx`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory IKE), `documentation/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory IKE), `docs/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
 
 **Opis:**
 `Top10Panel` — lista 10 placówek z najwyższym IKE (z Zustand store, odświeżana przez WebSocket).
@@ -839,7 +839,7 @@ Manualne po aktywacji scenariusza Q100/chelm:
 - `backend/src/main/resources/db/seed_drogi.sql` (kilka przykładowych dróg)
 - `backend/src/main/resources/db/seed_biale_plamy.sql`
 
-**Dokumenty referencyjne:** `documentation/DATA_SCHEMA.md` (tabele `drogi_ewakuacyjne`, `biale_plamy`), `documentation/API_REFERENCE.md` (`GET /api/layers/{id}`)
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (tabele `drogi_ewakuacyjne`, `biale_plamy`), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
 
 **Opis:**
 Każda warstwa jako osobny komponent React-Leaflet. Widoczność kontrolowana przez
@@ -877,7 +877,7 @@ Trzy kalkulatory zasobów. Scraper placówek z mpips.gov.pl.
 - `backend/.../service/WfsClientService.java`
 - `backend/.../agent/FloodImportAgent.java` (zastępuje stub z 2.4)
 
-**Dokumenty referencyjne:** `documentation/ARCHITEKTURA_PLAN.md` (§4.2 — WFS endpoint, fallback)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.2 — WFS endpoint, fallback)
 
 **Opis:**
 `WfsClientService` — HTTP GET na WFS ISOK (GML), parsowanie GML → GeoJSON,
@@ -912,7 +912,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 - `backend/.../service/KalkulatorService.java`
 - `backend/.../controller/KalkulatorController.java`
 
-**Dokumenty referencyjne:** `documentation/API_REFERENCE.md` (`POST /api/calculate/transport`, `relocation`, `threat`)
+**Dokumenty referencyjne:** `docs/API_REFERENCE.md` (`POST /api/calculate/transport`, `relocation`, `threat`)
 
 **Opis:**
 Trzy metody w `KalkulatorService`, każda z zapytaniem PostGIS `ST_DWithin`:
@@ -949,7 +949,7 @@ curl -s -X POST http://localhost:8080/api/calculate/relocation \
 - `frontend/src/components/calculators/ThreatSpreadCalculator.tsx`
 - `frontend/src/components/calculators/CalculatorHub.tsx`
 
-**Dokumenty referencyjne:** `documentation/PRD.md` (§5.2 F-10)
+**Dokumenty referencyjne:** `docs/PRD.md` (§5.2 F-10)
 
 **Opis:**
 `CalculatorHub` — drawer/modal z zakładkami 3 kalkulatorów, otwierany przyciskiem "Kalkulatory"
@@ -978,7 +978,7 @@ Manualne:
 - `backend/.../service/JsoupScraperService.java`
 - `backend/.../controller/ScraperController.java`
 
-**Dokumenty referencyjne:** `documentation/API_REFERENCE.md` (`POST /api/scraper/run`, `GET /api/scraper/log`), `documentation/PRD.md` (§5.2 F-11)
+**Dokumenty referencyjne:** `docs/API_REFERENCE.md` (`POST /api/scraper/run`, `GET /api/scraper/log`), `docs/PRD.md` (§5.2 F-11)
 
 **Opis:**
 Scraper HTML z Jsoup, źródło: `mpips.gov.pl/rejestr-placowek` lub BIP powiatów.
@@ -1018,7 +1018,7 @@ Cel: asystent głosowy (Web Speech API + Whisper fallback), pełny Docker stack 
 - `frontend/src/components/voice/VoiceAssistant.tsx`
 - `frontend/src/components/voice/VoiceButton.tsx`
 
-**Dokumenty referencyjne:** `documentation/PRD.md` (§5.2 F-12 — tabela komend)
+**Dokumenty referencyjne:** `docs/PRD.md` (§5.2 F-12 — tabela komend)
 
 **Opis:**
 `voiceService.ts` — Web Speech API (`SpeechRecognition`), język `pl-PL`.
@@ -1051,7 +1051,7 @@ Manualne (Chrome, localhost lub HTTPS):
 - `backend/src/main/resources/application-prod.yml`
 - `docker-compose.full.yml` (finalizacja — wersja kompletna z healthcheckami)
 
-**Dokumenty referencyjne:** `documentation/DEPLOYMENT.md` (sekcje 5, 8), `documentation/ARCHITEKTURA_PLAN.md` (§2)
+**Dokumenty referencyjne:** `docs/DEPLOYMENT.md` (sekcje 5, 8), `docs/ARCHITEKTURA_PLAN.md` (§2)
 
 **Opis:**
 `backend/Dockerfile` — multi-stage: `maven:3.9-eclipse-temurin-21` (build) → `eclipse-temurin:21-jre` (run).

@@ -177,7 +177,7 @@ częściowych wyników IKE.
 
 #### F-05 — IKE (Indeks Krytyczności Ewakuacji)
 
-Szczegóły: `documentation/IKE_ALGORITHM.md`.
+Szczegóły: `docs/IKE_ALGORITHM.md`.
 
 - Automatyczne przeliczanie po `ThreatUpdatedEvent`
 - Kolorowanie markerów: czerwony (≥0.70) / żółty (0.40–0.69) / zielony (<0.40)
@@ -286,7 +286,7 @@ Szczegóły: `documentation/IKE_ALGORITHM.md`.
 
 ## 8. Architektura (skrót)
 
-Szczegóły: `documentation/ARCHITEKTURA_PLAN.md`.
+Szczegóły: `docs/ARCHITEKTURA_PLAN.md`.
 
 ```
 Frontend (React)
@@ -353,4 +353,4 @@ PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 | Asynchroniczne `@Async` listenery — trudniejsze debugowanie | Szczegółowe logowanie eventów; ID korelacji w każdym evencie |
 | PostGIS zapytania wolne przy 48 placówkach × 5 stref | Indeksy GiST; cache wyników IKE w `ike_results`; batch processing |
 | Web Speech API nie działa w Firefox / bez HTTPS | Fallback Whisper API; przyciski predefiniowanych komend w UI |
-| GeoJSON granic niedostępny | GADM 4.1 jako źródło z instrukcją pobierania w `documentation/DATA_SCHEMA.md` |
+| GeoJSON granic niedostępny | GADM 4.1 jako źródło z instrukcją pobierania w `docs/DATA_SCHEMA.md` |

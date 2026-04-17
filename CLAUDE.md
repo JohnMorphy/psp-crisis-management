@@ -53,7 +53,7 @@ eliminując race condition.
 
 ## Struktura repozytorium
 
-Pełna, aktualna struktura katalogów: `documentation/ARCHITEKTURA_PLAN.md` §5.
+Pełna, aktualna struktura katalogów: `docs/ARCHITEKTURA_PLAN.md` §5.
 
 **Zasada izolacji:** frontend i backend to dwa osobne projekty — nie importują wzajemnie
 swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (STOMP).
@@ -70,16 +70,16 @@ swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (ST
 
 | Plik | Zawartość |
 |---|---|
-| `documentation/PRD.md` | Wymagania funkcjonalne, model działania, user stories |
-| `documentation/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, cele iteracji |
-| `documentation/BACKLOG.md` | **Zadania agentowe** — jedyne źródło prawdy dla planu implementacji. Czytaj przed każdym zadaniem. |
-| `documentation/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
-| `documentation/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
-| `documentation/API_REFERENCE.md` | Kontrakty REST i WebSocket z przykładami request/response |
-| `documentation/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
+| `docs/PRD.md` | Wymagania funkcjonalne, model działania, user stories |
+| `docs/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, cele iteracji |
+| `docs/BACKLOG.md` | **Zadania agentowe** — jedyne źródło prawdy dla planu implementacji. Czytaj przed każdym zadaniem. |
+| `docs/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
+| `docs/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
+| `docs/API_REFERENCE.md` | Kontrakty REST i WebSocket z przykładami request/response |
+| `docs/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
 
 **Zasada:** przed implementacją dowolnego modułu przeczytaj najpierw odpowiednie zadanie
-w `documentation/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
+w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 ---
 
@@ -215,7 +215,7 @@ w `documentation/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 | Iteracja | Status | Deliverable |
 |---|---|---|
-| v1.0 — Fundament GIS | 🔄 W toku (1.1–1.8 ✅, 1.9–1.11 ⬜) | Mapa + granice (PL) + DPS-y + Spring Boot + PostGIS |
+| v1.0 — Fundament GIS | 🔄 W toku (1.1–1.9 ✅, 1.10–1.11 ⬜) | Mapa + granice (PL) + DPS-y + Spring Boot + PostGIS |
 | v1.1 — Event-driven core | ⬜ Nie rozpoczęta | ThreatUpdatedEvent + IkeAgent + DecisionAgent + WebSocket |
 | v1.2 — Import i kalkulatory | ⬜ Nie rozpoczęta | FloodImportAgent (WFS) + 3 kalkulatory + Scraper |
 | v1.3 — UX i głos | ⬜ Nie rozpoczęta | ScenarioPanel + asystent głosowy + Docker prod |
@@ -243,7 +243,7 @@ docker compose -f docker-compose.full.yml up --build
 - `start-dev.cmd` — odpowiednik `docker compose up -d postgres`
 - `start-all.cmd` — odpowiednik `docker compose -f docker-compose.full.yml up --build`
 
-Szczegóły: `documentation/DEPLOYMENT.md`.
+Szczegóły: `docs/DEPLOYMENT.md`.
 
 ---
 
@@ -252,11 +252,11 @@ Szczegóły: `documentation/DEPLOYMENT.md`.
 | Szukam... | Ścieżka |
 |---|---|
 | Definicja eventu | `backend/.../event/ThreatUpdatedEvent.java` |
-| Logika IKE | `backend/.../agent/IkeAgent.java` + `documentation/IKE_ALGORITHM.md` |
+| Logika IKE | `backend/.../agent/IkeAgent.java` + `docs/IKE_ALGORITHM.md` |
 | Import WFS | `backend/.../agent/FloodImportAgent.java` |
 | Rekomendacje | `backend/.../agent/DecisionAgent.java` |
-| Kontrakty API | `documentation/API_REFERENCE.md` |
-| Schematy SQL + seed | `documentation/DATA_SCHEMA.md` |
+| Kontrakty API | `docs/API_REFERENCE.md` |
+| Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
 | Konfiguracja warstw | tabela `layer_config` — seed: `db/seed_layers.sql` |
 | Wagi IKE | `backend/src/main/resources/ike.config.json` (frontend pobiera przez `GET /api/ike/config`) |
 
@@ -268,7 +268,7 @@ Ta sekcja obowiązuje w każdej sesji implementacyjnej. Czytaj przed rozpoczęci
 
 ### Jedno zadanie = jeden commit
 
-Każda sesja implementuje **dokładnie jedno zadanie** z `documentation/BACKLOG.md`.
+Każda sesja implementuje **dokładnie jedno zadanie** z `docs/BACKLOG.md`.
 Zadanie jest skończone gdy: kod działa + weryfikacja przeszła.
 Nie zaczynaj kolejnego zadania w tej samej sesji.
 
@@ -335,7 +335,7 @@ npm run build   # musi przejść bez błędów
 
 Każda nowa sesja zaczyna się od przeczytania:
 1. Tego pliku (`CLAUDE.md`) — aktualny stan projektu
-2. `documentation/BACKLOG.md` — które zadanie jest następne
+2. `docs/BACKLOG.md` — które zadanie jest następne
 3. Dokumentów wskazanych przez to zadanie
 
 Nie zakładaj że pamiętasz cokolwiek z poprzedniej sesji.

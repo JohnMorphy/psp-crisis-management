@@ -206,3 +206,24 @@ CREATE TABLE IF NOT EXISTS evacuation_decisions (
 CREATE INDEX IF NOT EXISTS idx_decisions_placowka    ON evacuation_decisions(placowka_kod);
 CREATE INDEX IF NOT EXISTS idx_decisions_correlation ON evacuation_decisions(correlation_id);
 CREATE INDEX IF NOT EXISTS idx_decisions_rekomendacja ON evacuation_decisions(rekomendacja);
+
+-- ============================================================
+-- TABELA: granice_administracyjne
+-- Wypełniana przez AdminBoundaryImportAgent z GUGiK PRG WFS.
+-- Import idempotentny: DELETE poziom + INSERT przy każdym wywołaniu importu.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS granice_administracyjne (
+    id              SERIAL PRIMARY KEY,
+    kod_teryt       VARCHAR(7)   UNIQUE NOT NULL,
+    nazwa           VARCHAR(200) NOT NULL,
+    poziom          VARCHAR(12)  NOT NULL
+                    CHECK (poziom IN ('wojewodztwo', 'powiat', 'gmina')),
+    kod_nadrzedny   VARCHAR(6),
+    geom            GEOMETRY(MULTIPOLYGON, 4326) NOT NULL,
+    zrodlo          VARCHAR(20)  DEFAULT 'prg_wfs',
+    data_importu    TIMESTAMPTZ  DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_granice_poziom       ON granice_administracyjne(poziom);
+CREATE INDEX IF NOT EXISTS idx_granice_geom         ON granice_administracyjne USING GIST(geom);
+CREATE INDEX IF NOT EXISTS idx_granice_kod_teryt    ON granice_administracyjne(kod_teryt);
+CREATE INDEX IF NOT EXISTS idx_granice_kod_nadrz    ON granice_administracyjne(kod_nadrzedny);

@@ -353,7 +353,7 @@ Gdy IKE = null (E6/E11):
 
 ## 9. Konfiguracja wag
 
-Patrz `backend/src/main/resources/ike.config.json` i `documentation/DATA_SCHEMA.md` sekcja 8.
+Patrz `backend/src/main/resources/ike.config.json` i `docs/DATA_SCHEMA.md` sekcja 8.
 
 Plik leży po stronie backendu i wczytywany jest przez `IkeAgent` przez `ClassPathResource`:
 

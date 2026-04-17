@@ -1,7 +1,7 @@
 # Tryb full-stack — postgres + backend (+ frontend w zadaniu 4.2).
 # Służy do demo, onboardingu i deploymentu na VPS.
 # Nie wymaga lokalnej instalacji Javy ani Node.js.
-# Szczegóły: documentation/DEPLOYMENT.md
+# Szczegóły: docs/DEPLOYMENT.md
 
 services:
   postgres:

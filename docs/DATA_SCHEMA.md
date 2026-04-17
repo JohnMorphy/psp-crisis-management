@@ -847,7 +847,7 @@ EOF
 }
 ```
 
-Pełny opis algorytmu i edge case'ów: `documentation/IKE_ALGORITHM.md`.
+Pełny opis algorytmu i edge case'ów: `docs/IKE_ALGORITHM.md`.
 
 ---
 

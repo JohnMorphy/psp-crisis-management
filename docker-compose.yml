@@ -1,6 +1,6 @@
 # Tryb dev — tylko baza danych.
 # Backend i frontend uruchamiane lokalnie (./mvnw spring-boot:run, npm run dev).
-# Szczegóły: documentation/DEPLOYMENT.md
+# Szczegóły: docs/DEPLOYMENT.md
 
 services:
   postgres:
