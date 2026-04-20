@@ -1,11 +1,13 @@
 import Header from './Header'
+import Footer from './Footer'
 import MapContainer from '../map/MapContainer'
 import LayerControlPanel from '../panels/LayerControlPanel'
 import RegionInfoPanel from '../panels/RegionInfoPanel'
 import { useMapStore } from '../../store/mapStore'
 
+
 function AppShell() {
-  const { isPanelCollapsed, togglePanel } = useMapStore()
+  const { isPanelCollapsed } = useMapStore()
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
@@ -24,16 +26,7 @@ function AppShell() {
         )}
       </div>
 
-      <footer className="flex items-center gap-4 px-4 py-2 bg-gray-800 border-t border-gray-700 text-sm text-gray-400 shrink-0">
-        <button
-          onClick={togglePanel}
-          className="hover:text-white transition-colors"
-        >
-          {isPanelCollapsed ? '▶ Rozwiń panel' : '◀ Zwiń panel'}
-        </button>
-        <button className="hover:text-white transition-colors">🗺 Reset widoku</button>
-        <button className="hover:text-white transition-colors">⊕ Kalkulatory</button>
-      </footer>
+      <Footer />
     </div>
   )
 }

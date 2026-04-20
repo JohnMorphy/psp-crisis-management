@@ -11,7 +11,10 @@ interface LayerConfig {
 }
 
 function LayerControlPanel() {
-  const { activeLayers, toggleLayer } = useMapStore()
+  const activeLayers = useMapStore().activeLayers;
+  const toggleLayer = useMapStore().toggleLayer;
+
+  // const { activeLayers, toggleLayer } = useMapStore()
 
   const { data: layers = [], isLoading } = useQuery<LayerConfig[]>({
     queryKey: ['layers'],
