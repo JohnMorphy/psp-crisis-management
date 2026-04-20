@@ -4,14 +4,19 @@ import AdminBoundaryLayer from './layers/AdminBoundaryLayer'
 import DPSLayer from './layers/DPSLayer'
 import ThreatZoneLayer from './layers/ThreatZoneLayer'
 
-const MAP_CENTER: [number, number] = [51.25, 22.57]
-const INITIAL_ZOOM = 9
+const MAP_CENTER: [number, number] = [52.1, 19.4]
+const INITIAL_ZOOM = 6
+const MAP_MIN_ZOOM = 5
+const MAP_MAX_BOUNDS: [[number, number], [number, number]] = [[48.0, 13.0], [55.5, 26.5]]
 
 function MapContainer() {
   return (
     <LeafletMapContainer
       center={MAP_CENTER}
       zoom={INITIAL_ZOOM}
+      minZoom={MAP_MIN_ZOOM}
+      maxBounds={MAP_MAX_BOUNDS}
+      maxBoundsViscosity={1.0}
       style={{ height: '100%', width: '100%' }}
     >
       <TileLayer

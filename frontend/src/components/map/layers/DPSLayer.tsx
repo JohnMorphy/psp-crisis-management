@@ -32,6 +32,7 @@ function DPSLayer() {
         key={props.kod}
         center={[lat, lng]}
         radius={8}
+        pane="markerPane"
         pathOptions={{
           color: color,
           fillColor: color,

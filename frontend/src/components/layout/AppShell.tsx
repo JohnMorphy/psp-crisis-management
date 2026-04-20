@@ -10,13 +10,13 @@ function AppShell() {
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
       <Header />
-      <div className="flex flex-1 overflow-hidden">
-        <main className={`transition-all duration-300 bg-gray-950 ${isPanelCollapsed ? 'w-full' : 'w-[70%]'}`}>
+      <div className="flex flex-1 overflow-hidden relative">
+        <main className="w-full bg-gray-950">
           <MapContainer />
         </main>
 
         {!isPanelCollapsed && (
-          <aside className="w-[30%] bg-gray-800 overflow-y-auto border-l border-gray-700 flex flex-col">
+          <aside className="absolute right-0 top-0 h-full w-80 bg-gray-800/95 backdrop-blur-sm overflow-y-auto border-l border-gray-700 flex flex-col z-[1000]">
             <LayerControlPanel />
             <RegionInfoPanel />
             {/* ScenarioPanel, Top10Panel, DecisionPanel — kolejne zadania */}

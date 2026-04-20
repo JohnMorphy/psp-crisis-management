@@ -1,5 +1,6 @@
 package pl.lublin.dashboard.agent;
 
+import org.antlr.v4.runtime.misc.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +26,6 @@ public class AdminBoundaryImportAgent {
     private static final String WFS_BASE_URL =
         "https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WFS/AdministrativeBoundaries";
     private static final int PAGE_SIZE       = 100;
-    private static final int PAGE_SIZE_GMINY = 50;
 
     private static final String INSERT_SQL = """
         INSERT INTO granice_administracyjne
@@ -62,7 +62,7 @@ public class AdminBoundaryImportAgent {
             log.info("Start importu granic administracyjnych [{}]", correlationId);
             importLevel("A01_Granice_wojewodztw", "wojewodztwo", PAGE_SIZE);
             importLevel("A02_Granice_powiatow",   "powiat",      PAGE_SIZE);
-            importLevel("A03_Granice_gmin",       "gmina",       PAGE_SIZE_GMINY);
+            importLevel("A03_Granice_gmin",       "gmina",       PAGE_SIZE);
             log.info("Import granic zakoncozny pomyslnie [{}]", correlationId);
         } catch (Exception e) {
             log.error("Blad importu granic [{}]", correlationId, e);

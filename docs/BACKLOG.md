@@ -548,6 +548,18 @@ Manualne — przeglądarka http://localhost:5173:
 
 ---
 
+### REVISION 1
+Przygotuj plan poprawy długu technicznego/błędów/potencjalnych kroków rozwoju (nie implementuj od razu - do review).
+
+Jak dotąd zauważone funkcjonalności do poprawy:
+* Boczny pasek - <LayerControlPanel /> - dziwnie zachowuje się w przypadku zwijania/zachowania. Mimo zwinięcia, przysłania poligony/dps-y narysowane na mapie.
+Chciałbym, aby boczne menu bardziej "nachodziło" na mapę, niż aby tworzyło własną zamkniętą przestrzeń. Funkcjonalność zwijania - niech pozostanie.
+* Brakuje opcji włączania/wyłączanie poszczególnych warstw terytorialnych. Województwa są (słusznie) domyślnie włączone, ale nie da się ich schować poprzez toggle on/off
+* Chcę zmienić domyślą lokalizację startową mapy na widok całej polski (nie jest już to dashboard tylko dla lublina), co wymaga również zmiany zoom-a
+* Zbadać, czy to możliwe aby ograniczyć możliwość zoom-out oraz poruszania się po całej mapie (wystarczy tylko widok Polski); choć oczywiście chcę dać możliwość zoom in/poruszania się po mapie
+
+---
+
 ## Iteracja v1.1 — Event-driven core
 
 Cel: pełny flow — wybór scenariusza przez operatora uruchamia automatyczny łańcuch

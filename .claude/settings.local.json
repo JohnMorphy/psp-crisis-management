@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm run:*)",
       "Bash(./mvnw compile:*)",
-      "Bash(./mvnw test *)"
+      "Bash(./mvnw test *)",
+      "Bash(docker compose *)"
     ]
   }
 }
