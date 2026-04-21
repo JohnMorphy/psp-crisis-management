@@ -15,6 +15,7 @@ public class CorsConfig {
 
         CorsConfiguration config = new CorsConfiguration();
         config.addAllowedOrigin("http://localhost:5173");  // Vite dev server
+
         config.addAllowedMethod("*");
         config.addAllowedHeader("*");
 

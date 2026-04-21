@@ -363,13 +363,13 @@ Działanie po IkeRecalculatedEvent:
 │       │   ├── layout/
 │       │   │   ├── AppShell.tsx
 │       │   │   ├── Header.tsx
-│       │   │   └── Sidebar.tsx
+│       │   │   ├── Footer.tsx              # ★ przyciski: zwiń panel, import, reset, kalkulatory
+│       │   │   └── NotificationList.tsx    # ★ toast lista — pozycja absolute top-20 right-4
 │       │   │
 │       │   ├── map/
 │       │   │   ├── MapContainer.tsx
 │       │   │   ├── MapControls.tsx
 │       │   │   ├── LayerManager.tsx
-│       │   │   ├── AdminBoundaries.tsx         # @deprecated — zastąpiony przez AdminBoundaryLayer
 │       │   │   ├── DPSPopup.tsx
 │       │   │   ├── EvacuationRoute.tsx
 │       │   │   └── layers/
@@ -408,9 +408,14 @@ Działanie po IkeRecalculatedEvent:
 │       │       ├── Tooltip.tsx
 │       │       └── Modal.tsx
 │       │
+│       ├── store/
+│       │   ├── mapStore.ts                 # ★ activeLayers, selectedRegion, isPanelCollapsed
+│       │   └── notificationStore.ts        # ★ notifications[], addNotification, removeNotification
+│       │
 │       ├── hooks/
 │       │   ├── useLayerData.ts
 │       │   ├── useAdminBoundaries.ts           # ★ hook dla L-08/L-09/L-10 z filtrem
+│       │   ├── importAdminBoundaries.ts        # wywołanie POST /api/admin-boundaries/import + powiadomienia
 │       │   ├── useWebSocket.ts
 │       │   ├── useFilters.ts
 │       │   └── useVoiceCommands.ts

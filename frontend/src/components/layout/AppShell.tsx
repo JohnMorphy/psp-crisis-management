@@ -4,6 +4,7 @@ import MapContainer from '../map/MapContainer'
 import LayerControlPanel from '../panels/LayerControlPanel'
 import RegionInfoPanel from '../panels/RegionInfoPanel'
 import { useMapStore } from '../../store/mapStore'
+import NotificationList from './NotificationList'
 
 
 function AppShell() {
@@ -12,6 +13,7 @@ function AppShell() {
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
       <Header />
+      <NotificationList />
       <div className="flex flex-1 overflow-hidden relative">
         <main className="w-full bg-gray-950">
           <MapContainer />

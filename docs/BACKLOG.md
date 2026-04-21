@@ -23,7 +23,7 @@
 
 > Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
 
-**Aktywne:** `— (ustaw przed startem sesji)`
+**Aktywne:** `1.12 — System powiadomień (Zustand)`
 
 ---
 
@@ -545,6 +545,53 @@ Manualne — przeglądarka http://localhost:5173:
 - Uproszczone geometrie (`geom_uproszczona`) gdy gminy będą zbyt wolne
 
 **Commit:** `feat(1.11): AdminBoundaryLayer wielopoziomowy + RegionInfoPanel TERYT`
+
+---
+
+### ✅ 1.12 — System powiadomień (Zustand)
+
+**Pliki stworzone/zmodyfikowane:**
+- `frontend/src/store/notificationStore.ts` — store Zustand: `Notification`, `NotificationType`, `addNotification`, `removeNotification`, `clearNotifications`, auto-usuwanie po `duration` ms
+- `frontend/src/components/layout/NotificationList.tsx` — lista powiadomień z kolorami wg `NotificationType`
+- `frontend/src/hooks/importAdminBoundaries.ts` — integracja: powiadomienie na start importu + blokada podwójnego kliknięcia
+
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory, zasady UI)
+
+**Opis:**
+`notificationStore` przechowuje tablicę `Notification[]`. Każde powiadomienie ma `status: NotificationType` (`success` | `error` | `info` | `warning`). `addNotification` generuje `id = crypto.randomUUID()`, opcjonalnie ustawia `setTimeout` na `removeNotification` po `duration` ms.
+
+`NotificationList` renderowany absolutnie nad mapą (`top-20 right-4 z-[1001]`). Kolor tła i tytułu zależy od `status`:
+- `success` → `bg-green-900 / text-green-300`
+- `error`   → `bg-red-900 / text-red-300`
+- `info`    → `bg-blue-900 / text-blue-300`
+- `warning` → `bg-yellow-900 / text-yellow-300`
+
+`importAdminBoundaries` używa `useNotificationStore.getState()` (Zustand poza hookiem React).
+Moduł-level `isRunning: boolean` blokuje podwójne wywołanie — przy ponownym kliknięciu wyświetla powiadomienie WARNING.
+
+**Integracja WebSocket (TODO — zadanie 2.5/2.6):**
+Docelowo `LiveFeedService` będzie pushował do `/topic/system` zdarzenia:
+- `ADMIN_IMPORT_STARTED` → `addNotification(INFO)`
+- `ADMIN_IMPORT_COMPLETED` → `addNotification(SUCCESS)`
+- `ADMIN_IMPORT_FAILED` → `addNotification(ERROR)`
+
+Hook `useWebSocket` (zadanie 2.6) odbierze te wiadomości i wywoła `addNotification` z `notificationStore`.
+Wtedy `isRunning` lock i powiadomienia optimistyczne z `importAdminBoundaries.ts` należy usunąć.
+Do tego momentu stan importu jest zarządzany client-side.
+
+**Weryfikacja:**
+```
+Manualne — przeglądarka:
+☐ Kliknięcie "Import danych terytorialnych" → powiadomienie INFO "Import rozpoczęty"
+☐ Ponowne kliknięcie podczas importu → powiadomienie WARNING "Import w toku"
+☐ Po zakończeniu → powiadomienie SUCCESS (lub ERROR jeśli backend niedostępny)
+☐ Powiadomienia z duration znikają automatycznie
+☐ Kliknięcie × usuwa powiadomienie
+☐ Kolory pasują do typu (zielony/czerwony/niebieski/żółty)
+☐ npm run build — 0 błędów TypeScript
+```
+
+**Commit:** `feat(1.12): notificationStore + NotificationList + importAdminBoundaries z powiadomieniami`
 
 ---
 
