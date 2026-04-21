@@ -1,7 +1,7 @@
 import { MapContainer as LeafletMapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import AdminBoundaryLayer from './layers/AdminBoundaryLayer'
-import DPSLayer from './layers/DPSLayer'
+import EntityLayer from './layers/EntityLayer'
 import ThreatZoneLayer from './layers/ThreatZoneLayer'
 
 const MAP_CENTER: [number, number] = [52.1, 19.4]
@@ -25,7 +25,7 @@ function MapContainer() {
       />
       <AdminBoundaryLayer />
       <ThreatZoneLayer />
-      <DPSLayer />
+      <EntityLayer />
     </LeafletMapContainer>
   )
 }

@@ -2,10 +2,10 @@ import Header from './Header'
 import Footer from './Footer'
 import MapContainer from '../map/MapContainer'
 import LayerControlPanel from '../panels/LayerControlPanel'
+import EntityFilterPanel from '../panels/EntityFilterPanel'
 import RegionInfoPanel from '../panels/RegionInfoPanel'
 import { useMapStore } from '../../store/mapStore'
 import NotificationList from './NotificationList'
-
 
 function AppShell() {
   const { isPanelCollapsed } = useMapStore()
@@ -22,8 +22,8 @@ function AppShell() {
         {!isPanelCollapsed && (
           <aside className="absolute right-0 top-0 h-full w-80 bg-gray-800/95 backdrop-blur-sm overflow-y-auto border-l border-gray-700 flex flex-col z-[1000]">
             <LayerControlPanel />
+            <EntityFilterPanel />
             <RegionInfoPanel />
-            {/* ScenarioPanel, Top10Panel, DecisionPanel — kolejne zadania */}
           </aside>
         )}
       </div>

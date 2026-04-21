@@ -9,6 +9,8 @@ import java.util.List;
 
 public interface GranicaAdministracyjnaRepository extends JpaRepository<GranicaAdministracyjna, Integer> {
 
+    java.util.Optional<GranicaAdministracyjna> findByKodTeryt(String kodTeryt);
+
     List<GranicaAdministracyjna> findByPoziom(String poziom);
 
     long countByPoziom(String poziom);

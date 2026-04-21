@@ -37,6 +37,7 @@ public class GeoService {
     @Autowired private ZasobTransportuRepository zasobTransportuRepository;
     @Autowired private IkeResultRepository ikeResultRepository;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private EntityRegistryService entityRegistryService;
 
     private final GeoJsonWriter geoJsonWriter;
     private Map<String, Object> powiaty;
@@ -69,10 +70,21 @@ public class GeoService {
         return powiaty;
     }
 
-    public Map<String, Object> buildLayerGeoJson(String layerId, String powiat, String gmina, String bbox) {
+    public Map<String, Object> buildLayerGeoJson(
+            String layerId,
+            String powiat,
+            String gmina,
+            String bbox,
+            String kodWoj,
+            String kodPow,
+            String kodGmina,
+            String category,
+            String source,
+            String q
+    ) {
         String timestamp = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         return switch (layerId) {
-            case "L-01", "L-02" -> buildPlacowkiLayer(layerId, timestamp, powiat);
+            case "L-01", "L-02" -> entityRegistryService.buildLayerGeoJson(layerId, category, source, kodWoj, kodPow, kodGmina, bbox, q);
             case "L-03"         -> buildStrefyLayer(timestamp);
             case "L-05"         -> buildTransportLayer(timestamp);
             case "L-06"         -> buildRelokacjaLayer(timestamp);

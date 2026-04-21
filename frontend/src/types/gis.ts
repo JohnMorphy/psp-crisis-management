@@ -19,19 +19,60 @@ export interface GeoJsonCollection<P = Record<string, unknown>> {
 
 export type IkeCategory = 'czerwony' | 'zolty' | 'zielony'
 
-export interface FacilityProperties {
-  kod: string
-  nazwa: string
-  typ: string | null
-  powiat: string
-  gmina: string
-  liczba_podopiecznych: number | null
-  pojemnosc_ogolna: number | null
-  niesamodzielni_procent: number | null
-  generator_backup: boolean | null
-  kontakt: string | null
+export interface EntityFeatureProperties {
+  id: number
+  source_record_id: string
+  name: string
+  subtitle: string | null
+  category_code: string
+  category_name: string
+  category_icon: string | null
+  source_code: string
+  source_name: string
+  status: string | null
+  owner_name: string | null
+  address_raw: string | null
+  teryt_woj: string | null
+  teryt_pow: string | null
+  teryt_gmina: string | null
+  lat: number | null
+  lon: number | null
+  contact_phone: string | null
+  contact_email: string | null
+  www: string | null
+  source_url: string | null
+  last_seen_at: string | null
+  last_import_batch_id: number | null
+  source_priority: number | null
+  match_confidence: number | null
+  attributes: Record<string, unknown>
   ike_score: number | null
   ike_kategoria: IkeCategory | null
+}
+
+export interface EntityCategory {
+  code: string
+  name: string
+  act_ref: string | null
+  icon: string | null
+  default_layer_group: string | null
+  geometry_mode: string | null
+  entity_count: number
+}
+
+export interface EntitySummaryBucket {
+  code: string
+  name: string
+  count: number
+}
+
+export interface EntitySummary {
+  kod_teryt: string
+  total_entities: number
+  verified_entities: number
+  needs_review_entities: number
+  categories: EntitySummaryBucket[]
+  sources: EntitySummaryBucket[]
 }
 
 export interface ThreatZoneProperties {

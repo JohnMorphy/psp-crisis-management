@@ -1,34 +1,30 @@
+import { useQuery } from '@tanstack/react-query'
 import { useMapStore } from '../../store/mapStore'
-import { useLayerData } from '../../hooks/useLayerData'
-import type { GeoJsonCollection, FacilityProperties } from '../../types/gis'
+import api from '../../services/api'
+import type { EntitySummary } from '../../types/gis'
 
 const POZIOM_LABELS: Record<string, string> = {
-  wojewodztwo: 'Województwo',
+  wojewodztwo: 'Wojewodztwo',
   powiat: 'Powiat',
   gmina: 'Gmina',
 }
 
 function RegionInfoPanel() {
   const selectedRegion = useMapStore((state) => state.selectedRegion)
-  const { data } = useLayerData<GeoJsonCollection<FacilityProperties>>('L-01')
+
+  const { data } = useQuery<EntitySummary>({
+    queryKey: ['entity-summary', selectedRegion?.kod_teryt],
+    queryFn: () =>
+      api.get<EntitySummary>('/api/entities/summary', {
+        params: { kod_teryt: selectedRegion?.kod_teryt },
+      }).then((response) => response.data),
+    enabled: Boolean(selectedRegion?.kod_teryt),
+    staleTime: 30_000,
+  })
 
   if (!selectedRegion) return null
 
   const { name, kod_teryt, poziom, properties } = selectedRegion
-  const isLubelskie = kod_teryt ? kod_teryt.startsWith('06') : false
-
-  const allFacilities = data?.features ?? []
-  const regionFacilities = allFacilities.filter(
-    (f) => f.properties.powiat === name
-  )
-  const totalPodopieczni = regionFacilities.reduce(
-    (sum, f) => sum + (f.properties.liczba_podopiecznych ?? 0),
-    0
-  )
-  const czerwonych = regionFacilities.filter(
-    (f) => f.properties.ike_kategoria === 'czerwony'
-  ).length
-
   const poziomLabel = poziom ? (POZIOM_LABELS[poziom] ?? poziom) : null
 
   return (
@@ -54,37 +50,37 @@ function RegionInfoPanel() {
         </div>
       )}
 
-      {poziom && !isLubelskie ? (
-        <p className="text-xs text-gray-500">
-          Brak danych placówek dla tego regionu
-        </p>
-      ) : (
+      {data ? (
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between text-gray-300">
-            <span>Placówki:</span>
-            <span className="font-medium text-white">{regionFacilities.length}</span>
+            <span>Podmioty:</span>
+            <span className="font-medium text-white">{data.total_entities}</span>
           </div>
           <div className="flex justify-between text-gray-300">
-            <span>Podopieczni:</span>
-            <span className="font-medium text-white">{totalPodopieczni}</span>
+            <span>Zweryfikowane:</span>
+            <span className="font-medium text-emerald-400">{data.verified_entities}</span>
           </div>
-          {czerwonych > 0 && (
-            <div className="flex justify-between text-gray-300">
-              <span>IKE czerwony:</span>
-              <span className="font-medium text-red-400">{czerwonych}</span>
+          <div className="flex justify-between text-gray-300">
+            <span>Do weryfikacji:</span>
+            <span className="font-medium text-amber-400">{data.needs_review_entities}</span>
+          </div>
+          {data.categories.slice(0, 4).map((category) => (
+            <div key={category.code} className="flex justify-between text-gray-300">
+              <span>{category.name}:</span>
+              <span className="font-medium text-white">{category.count}</span>
             </div>
-          )}
-          {regionFacilities.length === 0 && (
-            <p className="text-xs text-gray-500">
-              Brak danych dla wybranego regionu
-            </p>
+          ))}
+          {data.total_entities === 0 && (
+            <p className="text-xs text-gray-500">Brak podmiotow dla wybranego regionu</p>
           )}
         </div>
+      ) : (
+        <p className="text-xs text-gray-500">Brak danych podsumowujacych dla wybranego regionu</p>
       )}
 
       {!!properties['kod_nadrzedny'] && (
         <div className="text-xs text-gray-500">
-          Jednostka nadrzędna: <span className="font-mono">{String(properties['kod_nadrzedny'])}</span>
+          Jednostka nadrzedna: <span className="font-mono">{String(properties['kod_nadrzedny'])}</span>
         </div>
       )}
     </div>

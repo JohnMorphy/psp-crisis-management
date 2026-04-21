@@ -26,7 +26,12 @@ public class GeoController {
             @RequestParam(required = false) String powiat,
             @RequestParam(required = false) String gmina,
             @RequestParam(required = false) String bbox,
-            @RequestParam(name = "kod_woj", required = false) String kodWoj) {
+            @RequestParam(name = "kod_woj", required = false) String kodWoj,
+            @RequestParam(name = "kod_pow", required = false) String kodPow,
+            @RequestParam(name = "kod_gmina", required = false) String kodGmina,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String source,
+            @RequestParam(required = false) String q) {
 
         if ("L-00".equals(id)) {
             return ResponseEntity.ok(geoService.getAdminBoundaries());
@@ -54,7 +59,7 @@ public class GeoController {
             return ResponseEntity.status(404).body(error("Warstwa nie istnieje: " + id, "LAYER_NOT_FOUND"));
         }
 
-        return ResponseEntity.ok(geoService.buildLayerGeoJson(id, powiat, gmina, bbox));
+        return ResponseEntity.ok(geoService.buildLayerGeoJson(id, powiat, gmina, bbox, kodWoj, kodPow, kodGmina, category, source, q));
     }
 
     private Map<String, Object> error(String message, String code) {
