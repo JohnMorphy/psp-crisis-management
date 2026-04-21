@@ -41,13 +41,13 @@ public class GeoController {
         }
 
         if ("L-10".equals(id)) {
+            // Forcing filtering - dataset too big
             boolean hasKodWoj = kodWoj != null && !kodWoj.isBlank();
             boolean hasBbox = bbox != null && !bbox.isBlank();
             if (!hasKodWoj && !hasBbox) {
                 return ResponseEntity.status(400).body(error(
                         "Wymagany filtr: kod_woj lub bbox", "FILTER_REQUIRED"));
-            }
-            return ResponseEntity.ok(adminBoundaryService.getGminy(kodWoj, bbox));
+            }             return ResponseEntity.ok(adminBoundaryService.getGminy(kodWoj, bbox));
         }
 
         if (layerConfigRepository.findById(id).isEmpty()) {

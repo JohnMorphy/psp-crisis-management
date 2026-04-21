@@ -26,7 +26,7 @@ interface SingleBoundaryLayerProps {
 function SingleBoundaryLayer({ layerId, kodWoj }: SingleBoundaryLayerProps) {
   const isVisible = useMapStore((state) => state.activeLayers[layerId] ?? false)
   const setSelectedRegion = useMapStore((state) => state.setSelectedRegion)
-  const { data } = useAdminBoundaries(layerId, kodWoj, isVisible)
+  const { data } = useAdminBoundaries(layerId, kodWoj, isVisible);
   const selectedLayerRef = useRef<Layer | null>(null)
 
   if (!isVisible || !data?.features?.length) return null
@@ -61,11 +61,14 @@ function SingleBoundaryLayer({ layerId, kodWoj }: SingleBoundaryLayerProps) {
 }
 
 function AdminBoundaryLayer() {
+
+  const { selectedRegion } = useMapStore();
+
   return (
     <>
       <SingleBoundaryLayer layerId="L-08" />
       <SingleBoundaryLayer layerId="L-09" />
-      <SingleBoundaryLayer layerId="L-10" kodWoj="06" />
+      <SingleBoundaryLayer layerId="L-10" kodWoj={selectedRegion?.kod_teryt?.substring(0, 2)} />
     </>
   )
 }

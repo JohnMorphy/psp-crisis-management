@@ -56,6 +56,7 @@ public class AdminBoundaryService {
             granice = repository.findByPoziomAndKodWoj("gmina", kodWoj.trim());
         } else {
             double[] coords = parseBbox(bbox);
+            // forced filtering on gmina; doesn't allow full import; reason: too much data
             if (coords == null) return toFeatureCollection("L-10", Collections.emptyList());
             granice = repository.findByPoziomAndBbox("gmina", coords[0], coords[1], coords[2], coords[3]);
         }
