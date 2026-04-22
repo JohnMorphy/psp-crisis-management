@@ -16,8 +16,7 @@
 Interaktywny, webowy dashboard geospatialny dla Marszałka Województwa Lubelskiego
 umożliwiający podejmowanie decyzji opartych na danych w czasie rzeczywistym.
 
-Moduł główny: **zorganizowana, priorytetowa ewakuacja podopiecznych DPS-ów
-i placówek opiekuńczych** w warunkach powodzi, pożaru lub blackoutu energetycznego.
+Moduł główny: **zorganizowana, priorytetowa ewakuacja podopiecznych podmiotów/jednostek ochrony ludności** (DPS-y, placówki opiekuńcze, domy dziecka, hospicja) w warunkach powodzi, pożaru lub blackoutu energetycznego.
 
 ### Problem
 
@@ -33,7 +32,7 @@ w kryzysie bezpośrednio zagraża życiu osób zależnych.
 | Czas ładowania mapy | < 3 s przy łączu 10 Mbps | Lighthouse |
 | Czas odpowiedzi API (p95) | < 200 ms | Spring Boot Actuator |
 | Czas od wyboru scenariusza do aktualizacji mapy | < 30 s | Test e2e (import WFS + IKE + WebSocket) |
-| Pokrycie placówek DPS w bazie | 100% DPS-ów województwa | `SELECT COUNT(*) FROM placowka` |
+| Pokrycie placówek w bazie | 100% DPS-ów i jednostek ochrony ludności województwa | `SELECT COUNT(*) FROM placowka` |
 | Zmiana warstwy / filtra w UI | < 500 ms | Test manualny |
 
 ---
@@ -155,7 +154,7 @@ częściowych wyników IKE.
 
 | ID | Nazwa | Typ | Źródło |
 |---|---|---|---|
-| L-01 | DPS i placówki opiekuńcze | Punkty | Tabela `placowka` |
+| L-01 | Jednostki ochrony ludności (DPS, placówki opiekuńcze, domy dziecka, hospicja) | Punkty | Tabela `placowka` |
 | L-02 | Gęstość podopiecznych | Heatmapa | Tabela `placowka` |
 | L-03 | Strefy zagrożenia | Poligony | Tabela `strefy_zagrozen` |
 | L-04 | Drożność dróg ewakuacyjnych | Linie | Tabela `drogi_ewakuacyjne` |
@@ -223,11 +222,12 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 - Wejście: typ zagrożenia, prędkość rozprzestrzeniania
 - Wynik: szacowany czas do objęcia placówki zagrożeniem
 
-#### F-11 — Scraper danych urzędowych
+#### F-11 — Import i scraping danych podmiotów
 
-- Pobieranie danych o placówkach z mpips.gov.pl i BIP powiatów
-- Zapis do bazy z `zrodlo = 'scraping'`
-- Log scrapingu z liczbą rekordów i błędami
+- Pobieranie danych o placówkach z mpips.gov.pl, BIP powiatów i innych rejestrów urzędowych
+- Ujednolicony rejestr podmiotów: tabela `entity_registry` + `entity_category` (kategoryzacja typów jednostek)
+- Zapis do bazy z `zrodlo = 'scraping'` lub `zrodlo = 'wfs'`
+- Log importu z liczbą rekordów i błędami (tabela `entity_import_batch`)
 
 #### F-12 — Asystent głosowy
 
@@ -241,7 +241,7 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 | „Wyłącz transport" | Toggle L-05 |
 | „Aktywuj powódź Q100" | Uruchomienie scenariusza powodziowego |
 | „Które placówki są czerwone?" | Filtr IKE = czerwony |
-| „Pokaż trasę ewakuacji dla DPS Końskowola" | Trasa na mapie |
+| „Pokaż trasę ewakuacji dla placówki Końskowola" | Trasa na mapie |
 | „Odśwież dane" | Manualne odświeżenie warstw |
 
 - Technologia: Web Speech API + fallback Whisper API (OpenAI)
@@ -276,11 +276,11 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 
 | Dane | Plik seed | Rekordy |
 |---|---|---|
-| Placówki DPS | `seed_dps.sql` | 48 (po 2 na powiat) |
-| Miejsca relokacji | `seed_relokacja.sql` | ~10 |
-| Zasoby transportowe | `seed_transport.sql` | ~10 |
-| Konfiguracja warstw | `seed_layers.sql` | 7 (L-01…L-07) |
-| Strefy zagrożeń (demo) | `seed_strefy.sql` | ~5 |
+| Placówki (DPS + jednostki ochrony ludności) | `02_seed_dps.sql` | 46+ (po 2 na powiat) |
+| Konfiguracja warstw | `03_seed_layers.sql` | 7 (L-01…L-07) |
+| Miejsca relokacji | `04_seed_relokacja.sql` | ~10 |
+| Strefy zagrożeń (demo) | `05_seed_strefy.sql` | ~5 |
+| Zasoby transportowe | `06_seed_transport.sql` | ~10 |
 
 ---
 
@@ -338,7 +338,7 @@ PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 
 | Iteracja | Zakres |
 |---|---|
-| **v1.0 — Fundament GIS** | Mapa, granice, DPS-y, Spring Boot, PostGIS, seed 48 placówek, REST `/api/layers`, `/api/ike` |
+| **v1.0 — Fundament GIS** | Mapa, granice, jednostki ochrony ludności, entity registry, Spring Boot, PostGIS, seed placówek, REST `/api/layers`, `/api/ike` |
 | **v1.1 — Event-driven core** | `ThreatUpdatedEvent`, `IkeAgent`, `DecisionAgent`, `LiveFeedService`, WebSocket, `ScenarioPanel`, `DecisionPanel` |
 | **v1.2 — Import i kalkulatory** | `FloodImportAgent` (WFS + fallback), `POST /api/threat/flood/import`, `POST /api/threat/clear`, 3 kalkulatory, Scraper |
 | **v1.3 — UX i głos** | Asystent głosowy (Web Speech API + Whisper), pełny docker-compose, testy wydajnościowe |

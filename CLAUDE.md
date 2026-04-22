@@ -3,13 +3,14 @@
 > Ten plik jest automatycznie wczytywany przez Claude Code na początku każdej sesji.
 > Zawiera zasady projektu, mapę dokumentacji i aktualny status iteracji.
 > Nie modyfikuj tego pliku bez aktualizacji sekcji `## Status projektu`.
+> Zawsze używaj mcp Context7 gdy potrzebujesz dokumentację API/biblioteki, tworzysz kod robisz setup/konfigurację bez mojego konkretnego wskazania.
 
 ---
 
 ## Czym jest ten projekt
 
 Geospatial Decision Dashboard dla Marszałka Województwa Lubelskiego.
-Moduł główny: **Ewakuacja osób zależnych (DPS-y) w kryzysie** (powódź / pożar / blackout).
+Moduł główny: **Ewakuacja osób zależnych (podmioty/jednostki ochrony ludności: DPS, placówki opiekuńcze, domy dziecka, hospicja) w kryzysie** (powódź / pożar / blackout).
 
 Użytkownik docelowy: osoba decyzyjna (nie-programista), pracująca na dużym monitorze
 lub tablecie podczas briefingu kryzysowego. System odpowiada na pytanie:
@@ -160,7 +161,7 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 - ✅ Font minimum 14px. Ciemny motyw (`bg-gray-900` / `bg-gray-800`).
 - ✅ Kolory IKE: czerwony `#EF4444` (≥0.70), żółty `#F59E0B` (0.40–0.69),
   zielony `#22C55E` (<0.40).
-- ❌ Popup DPS = Leaflet Popup, nie modal.
+- ❌ Popup placówki = Leaflet Popup (`EntityPopup.tsx`), nie modal.
 
 ---
 
@@ -178,7 +179,7 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 │         React-Leaflet                    │  ┌────────────────┐  │
 │         + warstwy GIS                    │  │ LayerControl   │  │
 │                                          │  │ (toggle+czas)  │  │
-│   [Kliknięcie DPS → Popup Leaflet]       │  └────────────────┘  │
+│   [Kliknięcie placówki → Popup Leaflet]   │  └────────────────┘  │
 │                                          │  ┌────────────────┐  │
 │                                          │  │ Top10Panel     │  │
 │                                          │  │ (lista IKE)    │  │
@@ -192,10 +193,10 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Popup DPS:**
+**Popup placówki (`EntityPopup.tsx`):**
 ```
 ┌─────────────────────────────────┐
-│ 🔴 DPS "Nazwa placówki"   [✕]  │
+│ 🔴 [Typ] "Nazwa placówki" [✕]  │
 │ Powiat: lubelski · Gmina: ...   │
 │ ─────────────────────────────── │
 │ Podopieczni: 45 (32 niesamodz.) │
@@ -215,7 +216,7 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 | Iteracja | Status | Deliverable |
 |---|---|---|
-| v1.0 — Fundament GIS | ✅ Ukończona (1.1–1.11 ✅) | Mapa + granice (PL) + DPS-y + Spring Boot + PostGIS |
+| v1.0 — Fundament GIS | ✅ Ukończona (1.1–1.12 ✅) | Mapa + granice (PL) + jednostki ochrony ludności + entity registry + Spring Boot + PostGIS |
 | v1.1 — Event-driven core | ⬜ Nie rozpoczęta | ThreatUpdatedEvent + IkeAgent + DecisionAgent + WebSocket |
 | v1.2 — Import i kalkulatory | ⬜ Nie rozpoczęta | FloodImportAgent (WFS) + 3 kalkulatory + Scraper |
 | v1.3 — UX i głos | ⬜ Nie rozpoczęta | ScenarioPanel + asystent głosowy + Docker prod |
@@ -257,8 +258,11 @@ Szczegóły: `docs/DEPLOYMENT.md`.
 | Rekomendacje | `backend/.../agent/DecisionAgent.java` |
 | Kontrakty API | `docs/API_REFERENCE.md` |
 | Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
-| Konfiguracja warstw | tabela `layer_config` — seed: `db/seed_layers.sql` |
+| Konfiguracja warstw | tabela `layer_config` — seed: `db/03_seed_layers.sql` |
 | Wagi IKE | `backend/src/main/resources/ike.config.json` (frontend pobiera przez `GET /api/ike/config`) |
+| Rejestr podmiotów | `backend/.../model/EntityRegistryEntry.java` + tabela `entity_registry` |
+| Warstwa placówek (frontend) | `frontend/src/components/map/layers/EntityLayer.tsx` |
+| Popup placówki (frontend) | `frontend/src/components/map/EntityPopup.tsx` |
 
 ---
 

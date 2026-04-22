@@ -29,21 +29,24 @@ operują na slugach. **Nie używaj form `M. Lublin`, `M. Chełm` w kolumnach `po
 
 ## Spis treści
 
+Pliki seed wykonywane w kolejności: `01_schema.sql` → `02_seed_dps.sql` → `03_seed_layers.sql` → `04_seed_relokacja.sql` → `05_seed_strefy.sql` → `06_seed_transport.sql`
+
 1. [Schemat SQL — pełne DDL](#1-schemat-sql--pełne-ddl)
-2. [seed_dps.sql — placówki DPS](#2-seed_dpssql--placówki-dps)
-3. [seed_relokacja.sql — miejsca relokacji](#3-seed_relokacjasql--miejsca-relokacji)
-4. [seed_transport.sql — zasoby transportowe](#4-seed_transportsql--zasoby-transportowe)
-5. [seed_layers.sql — konfiguracja warstw GIS](#5-seed_layerssql--konfiguracja-warstw-gis)
-6. [seed_strefy.sql — strefy zagrożeń (demo)](#6-seed_strefysql--strefy-zagrożeń-demo)
+2. [02_seed_dps.sql — placówki (jednostki ochrony ludności)](#2-02_seed_dpssql--placówki-jednostki-ochrony-ludności)
+3. [03_seed_layers.sql — konfiguracja warstw GIS](#3-03_seed_layerssql--konfiguracja-warstw-gis)
+4. [04_seed_relokacja.sql — miejsca relokacji](#4-04_seed_relokacjasql--miejsca-relokacji)
+5. [05_seed_strefy.sql — strefy zagrożeń (demo)](#5-05_seed_strefysql--strefy-zagrożeń-demo)
+6. [06_seed_transport.sql — zasoby transportowe](#6-06_seed_transportsql--zasoby-transportowe)
 7. [Pliki GeoJSON — granice administracyjne (legacy L-00)](#7-pliki-geojson--granice-administracyjne-legacy-l-00)
 8. [Konfiguracja IKE — ike.config.json](#8-konfiguracja-ike--ikeconfigjson)
 9. [Tabela granice_administracyjne — PRG WFS](#9-tabela-granice_administracyjne--prg-wfs)
+10. [Tabela entity_registry — ujednolicony rejestr podmiotów](#10-tabela-entity_registry--ujednolicony-rejestr-podmiotów)
 
 ---
 
 ## 1. Schemat SQL — pełne DDL
 
-**Lokalizacja:** `backend/src/main/resources/db/schema.sql`
+**Lokalizacja:** `backend/src/main/resources/db/01_schema.sql`
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS postgis;
@@ -281,11 +284,11 @@ CREATE INDEX IF NOT EXISTS idx_decisions_rekomendacja ON evacuation_decisions(re
 
 ---
 
-## 2. `seed_dps.sql` — placówki DPS
+## 2. `02_seed_dps.sql` — placówki (jednostki ochrony ludności)
 
-**Lokalizacja:** `backend/src/main/resources/db/seed_dps.sql`
+**Lokalizacja:** `backend/src/main/resources/db/02_seed_dps.sql`
 **Tabela docelowa:** `placowka`
-**Liczba rekordów:** 48 (po 2 na każdy z 24 powiatów)
+**Liczba rekordów:** 46+ (po 2 na każdy z 23 powiatów + 4 miasta)
 
 > `ST_MakePoint(lon, lat)` — kolejność: **długość, szerokość** (X, Y).
 > Współrzędne woj. lubelskiego: szer. 50.20–51.90°N, dług. 21.60–24.20°E.
@@ -555,7 +558,7 @@ VALUES
 
 ---
 
-## 3. `seed_relokacja.sql` — miejsca relokacji
+## 4. `04_seed_relokacja.sql` — miejsca relokacji
 
 ```sql
 INSERT INTO miejsca_relokacji
@@ -605,7 +608,7 @@ VALUES
 
 ---
 
-## 4. `seed_transport.sql` — zasoby transportowe
+## 6. `06_seed_transport.sql` — zasoby transportowe
 
 ```sql
 INSERT INTO zasob_transportu
@@ -655,17 +658,19 @@ VALUES
 
 ---
 
-## 5. `seed_layers.sql` — konfiguracja warstw GIS
+## 3. `03_seed_layers.sql` — konfiguracja warstw GIS
+
+> Kolejność plików seed: `01_schema.sql` → `02_seed_dps.sql` → `03_seed_layers.sql` → `04_seed_relokacja.sql` → `05_seed_strefy.sql` → `06_seed_transport.sql`
 
 ```sql
 INSERT INTO layer_config
     (id, nazwa, komponent, typ_geometrii, domyslnie_wlaczona,
      endpoint, interval_odswiezania_s, kolor_domyslny, ikona, opis)
 VALUES
-('L-01', 'DPS i placówki opiekuńcze',
- 'DPSLayer', 'Point', TRUE,
+('L-01', 'Jednostki ochrony ludności',
+ 'EntityLayer', 'Point', TRUE,
  '/api/layers/L-01', 900, '#3B82F6', 'building',
- 'Lokalizacja placówek DPS i domów opieki'),
+ 'Lokalizacja jednostek ochrony ludności (DPS, placówki opiekuńcze, domy dziecka, hospicja)'),
 
 ('L-02', 'Gęstość podopiecznych',
  'HeatmapLayer', 'Heatmap', FALSE,
@@ -722,7 +727,7 @@ VALUES
 
 ---
 
-## 6. `seed_strefy.sql` — strefy zagrożeń (demo)
+## 5. `05_seed_strefy.sql` — strefy zagrożeń (demo)
 
 Dane demonstracyjne ładowane przy inicjalizacji bazy.
 W runtime tabela jest nadpisywana przez `FloodImportAgent`.
@@ -903,3 +908,55 @@ Potencjalne usprawnienie (DT — nie implementuj teraz): dwie geometrie per reko
 `geom` (pełna, do PostGIS ST_Intersects) + `geom_uproszczona`
 (ST_Simplify tolerance=0.001°, ~100m) do serwowania frontendowi.
 Szacunkowa redukcja rozmiaru GeoJSON dla gmin: ~60–70%.
+
+---
+
+## 10. Tabela `entity_registry` — ujednolicony rejestr podmiotów
+
+**Implementacja:** zadania 1.x (EntityRegistryEntry, EntityCategory, EntitySource, EntityImportBatch)
+
+Tabela `entity_registry` to ujednolicony rejestr wszystkich podmiotów/jednostek ochrony ludności
+importowanych z różnych źródeł (mpips, BIP, WFS, scraping). Służy jako staging area przed
+przeniesieniem danych do tabeli operacyjnej `placowka`.
+
+### Kluczowe tabele systemu entity registry
+
+| Tabela | Opis |
+|---|---|
+| `entity_registry` | Główna tabela — każdy rekord to podmiot z danego źródła |
+| `entity_category` | Kategorie podmiotów (DPS_dorosli, dom_dziecka, hospicjum, …) |
+| `entity_source` | Źródła danych (mpips, BIP_powiat, GUGiK_WFS, scraping_html, …) |
+| `entity_alias` | Alternatywne nazwy/kody tego samego podmiotu (deduplicacja) |
+| `entity_import_batch` | Log partii importu — kiedy, ile rekordów, błędy |
+
+### Powiązane encje Java
+
+```
+model/EntityRegistryEntry.java     → tabela entity_registry
+model/EntityCategory.java          → tabela entity_category
+model/EntitySource.java            → tabela entity_source
+model/EntityAlias.java             → tabela entity_alias
+model/EntityImportBatch.java       → tabela entity_import_batch
+
+service/EntityRegistryService.java → logika biznesowa
+service/EntityImportService.java   → import/upsert rekordów
+service/EntityBootstrapService.java → inicjalizacja danych startowych
+
+controller/EntityController.java   → GET /api/entities, /api/entities/{id}
+controller/ImportController.java   → POST /api/import/*
+```
+
+### Kluczowe pola `entity_registry`
+
+| Pole | Typ | Opis |
+|---|---|---|
+| `source_code` | VARCHAR(50) | Kod źródła (z tabeli `entity_source`) |
+| `source_record_id` | VARCHAR(120) | Identyfikator rekordu w źródle |
+| `category_code` | VARCHAR(80) | Kategoria (z tabeli `entity_category`) |
+| `name` | VARCHAR(255) | Nazwa podmiotu |
+| `teryt_woj/pow/gmina` | VARCHAR | Kody TERYT lokalizacji |
+| `geom` | GEOMETRY(Point,4326) | Lokalizacja |
+| `coverage_geom` | GEOMETRY | Zasięg działania (opcjonalny) |
+| `attributes_json` | jsonb | Dowolne atrybuty specyficzne dla kategorii |
+| `match_confidence` | DECIMAL(4,3) | Pewność dopasowania przy deduplicacji (0–1) |
+| `last_import_batch_id` | BIGINT | FK do `entity_import_batch` |

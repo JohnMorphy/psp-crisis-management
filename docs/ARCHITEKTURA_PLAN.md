@@ -144,42 +144,45 @@ volumes:
 │                    Backend — Spring Boot 3                    │
 │                                                               │
 │  Controllers                                                  │
-│  ├── ThreatController   POST /api/threat/flood/import        │
-│  │                      POST /api/threat/clear               │
 │  ├── GeoController      GET  /api/layers/{id} (L-01…L-10)   │
 │  ├── AdminBoundaryController POST /api/admin-boundaries/import│
+│  ├── EntityController   GET  /api/entities, /api/entities/{id}│
+│  ├── ImportController   POST /api/import/*                   │
 │  ├── IkeController      GET  /api/ike                        │
-│  ├── DecisionController GET  /api/decisions                  │
-│  └── KalkulatorController POST /api/calculate/*              │
+│  ├── LayerConfigController GET /api/layers                   │
+│  ├── ThreatController   [planned] POST /api/threat/*         │
+│  ├── DecisionController [planned] GET  /api/decisions        │
+│  └── KalkulatorController [planned] POST /api/calculate/*    │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐     │
 │  │           Decision Layer (Agents)                    │     │
 │  │                                                      │     │
 │  │  AdminBoundaryImportAgent (PRG WFS → granice_adm.)  │     │
-│  │                                                      │     │
-│  │  FloodImportAgent ──publishes──► ThreatUpdatedEvent  │     │
-│  │                                         │            │     │
-│  │  IkeAgent ◄── @EventListener ───────────┘            │     │
-│  │      │                                               │     │
+│  │  IkeAgent ◄── @EventListener(ThreatUpdatedEvent)    │     │
 │  │      └──publishes──► IkeRecalculatedEvent            │     │
-│  │                              │                       │     │
-│  │  DecisionAgent ◄─────────────┤  @EventListener      │     │
-│  │  LiveFeedService ◄───────────┘  @EventListener      │     │
-│  │  (LiveFeedService słucha też ThreatUpdatedEvent      │     │
-│  │   dla push stref po imporcie)                        │     │
+│  │  WfsGmlParser (parser GML dla WFS)                  │     │
+│  │                                                      │     │
+│  │  [planned v1.1] FloodImportAgent → ThreatUpdatedEvent│     │
+│  │  [planned v1.1] DecisionAgent ◄── IkeRecalculatedEvent│    │
+│  │  [planned v1.1] LiveFeedService ◄── oba eventy       │     │
 │  └─────────────────────────────────────────────────────┘     │
 │                                                               │
 │  Services                                                     │
-│  ├── GeoService         ładowanie GeoJSON z plików i bazy    │
-│  ├── KalkulatorService  kalkulatory zasobów (PostGIS)        │
-│  └── ScraperService     Jsoup + Apache POI                   │
+│  ├── GeoService              ładowanie GeoJSON z plików/bazy │
+│  ├── EntityBootstrapService  inicjalizacja entity_registry   │
+│  ├── EntityImportService     import/upsert podmiotów         │
+│  ├── EntityRegistryService   logika rejestru podmiotów       │
+│  ├── AdminBoundaryService    zapytania do granice_adm.       │
+│  ├── KalkulatorService       [planned v1.2]                  │
+│  └── ScraperService          [planned v1.2] Jsoup + POI      │
 └───────────────────────────┬──────────────────────────────────┘
                             │
 ┌───────────────────────────▼──────────────────────────────────┐
 │                PostgreSQL 15 + PostGIS                        │
 │  Jedyne źródło danych runtime.                               │
-│  placowka · strefy_zagrozen · ike_results                    │
-│  evacuation_decisions · layer_config · ...                   │
+│  placowka · entity_registry · entity_category · entity_source│
+│  strefy_zagrozen · ike_results · layer_config                │
+│  granice_administracyjne · miejsca_relokacji · ...           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -332,6 +335,8 @@ Działanie po IkeRecalculatedEvent:
 
 ## 5. Struktura katalogów
 
+> Legenda: brak oznaczenia = zaimplementowane, `# [planned]` = zaplanowane (kolejne iteracje)
+
 ```
 ./
 │
@@ -352,10 +357,6 @@ Działanie po IkeRecalculatedEvent:
 │       ├── main.tsx
 │       ├── App.tsx
 │       │
-│       ├── config/
-│       │   ├── layers.config.json      # konfiguracja warstw (fallback offline)
-│       │   └── ike.config.json         # wagi IKE
-│       │
 │       ├── types/
 │       │   └── gis.ts                  # typy GeoJSON + FacilityProperties + ThreatZoneProperties
 │       │
@@ -368,45 +369,35 @@ Działanie po IkeRecalculatedEvent:
 │       │   │
 │       │   ├── map/
 │       │   │   ├── MapContainer.tsx
-│       │   │   ├── MapControls.tsx
-│       │   │   ├── LayerManager.tsx
-│       │   │   ├── DPSPopup.tsx
-│       │   │   ├── EvacuationRoute.tsx
+│       │   │   ├── EntityPopup.tsx         # ★ popup Leaflet dla każdej jednostki ochrony ludności
 │       │   │   └── layers/
-│       │   │       ├── DPSLayer.tsx
-│       │   │       ├── HeatmapLayer.tsx
-│       │   │       ├── ThreatZoneLayer.tsx
-│       │   │       ├── DrogiLayer.tsx
-│       │   │       ├── TransportLayer.tsx
-│       │   │       ├── RelokacjaLayer.tsx
-│       │   │       ├── BialePlamiLayer.tsx
-│       │   │       └── AdminBoundaryLayer.tsx  # ★ L-08/L-09/L-10 — 3 poziomy admin
+│       │   │       ├── EntityLayer.tsx         # ★ markery jednostek ochrony ludności (L-01)
+│       │   │       ├── ThreatZoneLayer.tsx     # strefy zagrożenia (L-03)
+│       │   │       ├── AdminBoundaryLayer.tsx  # ★ L-08/L-09/L-10 — 3 poziomy admin
+│       │   │       ├── HeatmapLayer.tsx        # [planned] L-02
+│       │   │       ├── DrogiLayer.tsx          # [planned] L-04
+│       │   │       ├── TransportLayer.tsx      # [planned] L-05
+│       │   │       ├── RelokacjaLayer.tsx      # [planned] L-06
+│       │   │       └── BialePlamiLayer.tsx     # [planned] L-07
 │       │   │
 │       │   ├── panels/
-│       │   │   ├── ScenarioPanel.tsx       # ★ wybór scenariusza zagrożenia
-│       │   │   ├── DecisionPanel.tsx       # ★ rekomendacje DecisionAgent
 │       │   │   ├── LayerControlPanel.tsx
-│       │   │   ├── FilterPanel.tsx
-│       │   │   ├── Top10Panel.tsx
-│       │   │   └── RegionInfoPanel.tsx
+│       │   │   ├── EntityFilterPanel.tsx   # ★ filtry jednostek (typ, powiat, IKE)
+│       │   │   ├── RegionInfoPanel.tsx
+│       │   │   ├── ScenarioPanel.tsx       # [planned] wybór scenariusza zagrożenia
+│       │   │   ├── DecisionPanel.tsx       # [planned] rekomendacje DecisionAgent
+│       │   │   └── Top10Panel.tsx          # [planned] lista Top 10 IKE
 │       │   │
-│       │   ├── calculators/
+│       │   ├── calculators/               # [planned v1.2]
 │       │   │   ├── CalculatorHub.tsx
 │       │   │   ├── TransportCalculator.tsx
 │       │   │   ├── RelocationCalculator.tsx
 │       │   │   └── ThreatSpreadCalculator.tsx
 │       │   │
-│       │   ├── voice/
-│       │   │   ├── VoiceAssistant.tsx
-│       │   │   ├── VoiceButton.tsx
-│       │   │   └── CommandParser.ts
-│       │   │
-│       │   └── ui/
-│       │       ├── Badge.tsx
-│       │       ├── StatusIndicator.tsx
-│       │       ├── IKEScore.tsx
-│       │       ├── Tooltip.tsx
-│       │       └── Modal.tsx
+│       │   └── voice/                     # [planned v1.3]
+│       │       ├── VoiceAssistant.tsx
+│       │       ├── VoiceButton.tsx
+│       │       └── CommandParser.ts
 │       │
 │       ├── store/
 │       │   ├── mapStore.ts                 # ★ activeLayers, selectedRegion, isPanelCollapsed
@@ -414,22 +405,23 @@ Działanie po IkeRecalculatedEvent:
 │       │
 │       ├── hooks/
 │       │   ├── useLayerData.ts
-│       │   ├── useAdminBoundaries.ts           # ★ hook dla L-08/L-09/L-10 z filtrem
-│       │   ├── importAdminBoundaries.ts        # wywołanie POST /api/admin-boundaries/import + powiadomienia
-│       │   ├── useWebSocket.ts
-│       │   ├── useFilters.ts
-│       │   └── useVoiceCommands.ts
+│       │   ├── useEntityLayerData.ts       # ★ hook dla EntityLayer (entity_registry)
+│       │   ├── useAdminBoundaries.ts       # ★ hook dla L-08/L-09/L-10 z filtrem
+│       │   ├── importAdminBoundaries.ts    # wywołanie POST /api/admin-boundaries/import + powiadomienia
+│       │   ├── useWebSocket.ts             # [planned]
+│       │   ├── useFilters.ts               # [planned]
+│       │   └── useVoiceCommands.ts         # [planned v1.3]
 │       │
 │       ├── services/
 │       │   ├── api.ts
-│       │   ├── websocketService.ts
-│       │   ├── geocoder.ts
-│       │   └── routingService.ts
+│       │   ├── websocketService.ts         # [planned]
+│       │   ├── geocoder.ts                 # [planned]
+│       │   └── routingService.ts           # [planned]
 │       │
 │       └── utils/
-│           ├── colorScale.ts
-│           ├── formatters.ts
-│           └── geoUtils.ts
+│           ├── colorScale.ts               # [planned]
+│           ├── formatters.ts               # [planned]
+│           └── geoUtils.ts                 # [planned]
 │
 ├── backend/
 │   ├── pom.xml
@@ -439,66 +431,85 @@ Działanie po IkeRecalculatedEvent:
 │       ├── java/pl/lublin/dashboard/
 │       │   ├── DashboardApplication.java
 │       │   │
-│       │   ├── event/
-│       │   │   ├── ThreatUpdatedEvent.java      # ★ centralny event
-│       │   │   └── IkeRecalculatedEvent.java    # ★ event po przeliczeniu IKE
+│       │   ├── event/                           # [planned v1.1]
+│       │   │   ├── ThreatUpdatedEvent.java      # centralny event
+│       │   │   └── IkeRecalculatedEvent.java    # event po przeliczeniu IKE
 │       │   │
 │       │   ├── agent/                           # ★ warstwa agentowa
-│       │   │   ├── FloodImportAgent.java        # import WFS → publikacja ThreatUpdatedEvent
-│       │   │   ├── IkeAgent.java               # @EventListener → obliczanie IKE
-│       │   │   ├── DecisionAgent.java          # @EventListener → rekomendacje
-│       │   │   └── AdminBoundaryImportAgent.java# ★ import granic z GUGiK PRG WFS
+│       │   │   ├── AdminBoundaryImportAgent.java# ★ import granic z GUGiK PRG WFS
+│       │   │   ├── IkeAgent.java                # ★ @EventListener → obliczanie IKE
+│       │   │   ├── WfsGmlParser.java            # ★ parser GML dla WFS
+│       │   │   ├── FloodImportAgent.java        # [planned v1.2] import WFS → ThreatUpdatedEvent
+│       │   │   └── DecisionAgent.java           # [planned v1.1] @EventListener → rekomendacje
 │       │   │
 │       │   ├── config/
-│       │   │   ├── AsyncConfig.java            # ★ konfiguracja @Async (pula wątków)
 │       │   │   ├── WebSocketConfig.java
 │       │   │   ├── CorsConfig.java
-│       │   │   └── DataSourceConfig.java
+│       │   │   ├── DataSourceConfig.java
+│       │   │   └── AsyncConfig.java             # [planned v1.1] pula wątków dla agentów
 │       │   │
 │       │   ├── controller/
-│       │   │   ├── ThreatController.java       # ★ POST /api/threat/*
-│       │   │   ├── GeoController.java          # GET /api/layers/{id} L-01…L-10
-│       │   │   ├── AdminBoundaryController.java# ★ POST /api/admin-boundaries/import
+│       │   │   ├── GeoController.java           # GET /api/layers/{id} L-01…L-10
+│       │   │   ├── AdminBoundaryController.java # ★ POST /api/admin-boundaries/import
+│       │   │   ├── EntityController.java        # ★ GET /api/entities, /api/entities/{id}
+│       │   │   ├── ImportController.java        # ★ POST /api/import/*
 │       │   │   ├── LayerConfigController.java
 │       │   │   ├── IkeController.java
-│       │   │   ├── DecisionController.java     # ★ GET /api/decisions
-│       │   │   ├── KalkulatorController.java
-│       │   │   └── ScraperController.java
+│       │   │   ├── ThreatController.java        # [planned v1.1] POST /api/threat/*
+│       │   │   ├── DecisionController.java      # [planned v1.1] GET /api/decisions
+│       │   │   ├── KalkulatorController.java    # [planned v1.2]
+│       │   │   └── ScraperController.java       # [planned v1.2]
 │       │   │
 │       │   ├── service/
 │       │   │   ├── GeoService.java
-│       │   │   ├── AdminBoundaryService.java   # ★ zapytania do granice_administracyjne
-│       │   │   ├── LiveFeedService.java        # @EventListener → WebSocket push
-│       │   │   ├── KalkulatorService.java
-│       │   │   ├── ScraperService.java
-│       │   │   ├── JsoupScraperService.java
-│       │   │   ├── XlsxParserService.java
-│       │   │   ├── WfsClientService.java       # ★ klient WFS (GML→GeoJSON, EPSG)
-│       │   │   └── GeocodingService.java
+│       │   │   ├── AdminBoundaryService.java    # ★ zapytania do granice_administracyjne
+│       │   │   ├── EntityBootstrapService.java  # ★ inicjalizacja danych entity_registry
+│       │   │   ├── EntityImportService.java     # ★ import/upsert rekordów do entity_registry
+│       │   │   ├── EntityRegistryService.java   # ★ logika biznesowa rejestru podmiotów
+│       │   │   ├── LiveFeedService.java         # [planned v1.1] @EventListener → WebSocket push
+│       │   │   ├── KalkulatorService.java       # [planned v1.2]
+│       │   │   ├── ScraperService.java          # [planned v1.2]
+│       │   │   ├── JsoupScraperService.java     # [planned v1.2]
+│       │   │   ├── XlsxParserService.java       # [planned v1.2]
+│       │   │   ├── WfsClientService.java        # [planned v1.2] klient WFS (GML→GeoJSON, EPSG)
+│       │   │   └── GeocodingService.java        # [planned]
 │       │   │
 │       │   ├── repository/
 │       │   │   ├── PlacowkaRepository.java
-│       │   │   ├── AdminBoundaryRepository.java# ★ granice_administracyjne
+│       │   │   ├── GranicaAdministracyjnaRepository.java # ★ granice_administracyjne
+│       │   │   ├── EntityRegistryEntryRepository.java    # ★ entity_registry
+│       │   │   ├── EntityCategoryRepository.java         # ★ entity_category
+│       │   │   ├── EntitySourceRepository.java           # ★ entity_source
+│       │   │   ├── EntityAliasRepository.java            # ★ entity_alias
+│       │   │   ├── EntityImportBatchRepository.java      # ★ entity_import_batch
 │       │   │   ├── StrefaZagrozenRepository.java
 │       │   │   ├── IkeResultRepository.java
-│       │   │   ├── EvacuationDecisionRepository.java
+│       │   │   ├── MiejsceRelokacjiRepository.java
+│       │   │   ├── ZasobTransportuRepository.java
 │       │   │   ├── LayerConfigRepository.java
-│       │   │   ├── RelokacjaRepository.java
-│       │   │   └── TransportRepository.java
+│       │   │   └── EvacuationDecisionRepository.java     # [planned v1.1]
 │       │   │
 │       │   ├── model/
-│       │   │   ├── AdminBoundary.java # ★ encja granice_administracyjne
-│       │   │   ├── Placowka.java
+│       │   │   ├── GranicaAdministracyjna.java  # ★ encja granice_administracyjne
+│       │   │   ├── Placowka.java                # ★ operacyjna tabela jednostek ochrony ludności
+│       │   │   ├── EntityRegistryEntry.java     # ★ ujednolicony rejestr podmiotów (entity_registry)
+│       │   │   ├── EntityCategory.java          # ★ kategorie podmiotów (DPS, dom_dziecka, hospicjum…)
+│       │   │   ├── EntitySource.java            # ★ źródła danych (mpips, BIP, WFS…)
+│       │   │   ├── EntityAlias.java             # ★ alternatywne nazwy/kody podmiotów
+│       │   │   ├── EntityImportBatch.java       # ★ log importu partii podmiotów
 │       │   │   ├── StrefaZagrozen.java
 │       │   │   ├── IkeResult.java
-│       │   │   ├── EvacuationDecision.java     # ★ rekomendacja ewakuacyjna
 │       │   │   ├── MiejsceRelokacji.java
 │       │   │   ├── ZasobTransportu.java
-│       │   │   └── LayerConfig.java
+│       │   │   ├── LayerConfig.java
+│       │   │   └── EvacuationDecision.java      # [planned v1.1] rekomendacja ewakuacyjna
+│       │   │
+│       │   ├── handlers/
+│       │   │   └── SocketConnectionHandler.java # ★ obsługa połączeń WebSocket
 │       │   │
 │       │   └── scheduler/
-│       │       ├── LayerRefreshScheduler.java
-│       │       └── ScraperScheduler.java
+│       │       ├── LayerRefreshScheduler.java   # [planned]
+│       │       └── ScraperScheduler.java        # [planned v1.2]
 │       │
 │       └── resources/
 │           ├── application.yml
@@ -509,12 +520,12 @@ Działanie po IkeRecalculatedEvent:
 │           │   ├── lublin_gminy.geojson
 │           │   └── README.md               # instrukcja pobrania z GADM 4.1
 │           └── db/
-│               ├── schema.sql
-│               ├── seed_layers.sql
-│               ├── seed_dps.sql
-│               ├── seed_relokacja.sql
-│               ├── seed_transport.sql
-│               └── seed_strefy.sql
+│               ├── 01_schema.sql           # DDL wszystkich tabel
+│               ├── 02_seed_dps.sql         # placówki (DPS + jednostki ochrony ludności)
+│               ├── 03_seed_layers.sql      # konfiguracja warstw GIS
+│               ├── 04_seed_relokacja.sql   # miejsca relokacji
+│               ├── 05_seed_strefy.sql      # strefy zagrożeń (demo)
+│               └── 06_seed_transport.sql   # zasoby transportowe
 │
 └── docs/
     ├── PRD.md
@@ -616,7 +627,7 @@ Poniżej wyłącznie cele iteracji (co i dlaczego), bez listy kroków:
 
 | Iteracja | Cel |
 |---|---|
-| **v1.0 — Fundament GIS** | Działająca mapa z DPS-ami. Spring Boot serwuje dane z PostgreSQL przez REST. IKE liczone na żądanie. |
+| **v1.0 — Fundament GIS** | Działająca mapa z jednostkami ochrony ludności. Spring Boot serwuje dane z PostgreSQL przez REST. Entity registry dla ujednoliconego rejestru podmiotów. IKE liczone na żądanie. |
 | **v1.1 — Event-driven core** | Pełny flow: wybór scenariusza → ThreatUpdatedEvent → IKE → IkeRecalculatedEvent → rekomendacje + WebSocket push. |
 | **v1.2 — Import i kalkulatory** | Prawdziwy import WFS ISOK z fallbackiem syntetycznym. Trzy kalkulatory zasobów. Scraper HTML/XLSX. |
 | **v1.3 — UX i głos** | Asystent głosowy (Web Speech API + Whisper). Pełny Docker stack produkcyjny. |

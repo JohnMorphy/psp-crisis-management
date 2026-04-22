@@ -41,12 +41,12 @@ Deliverable: `curl http://localhost:8080/api/layers` zwraca 7 warstw,
 
 **Pliki do stworzenia:**
 - `docker-compose.yml`
-- `backend/src/main/resources/db/schema.sql`
-- `backend/src/main/resources/db/seed_layers.sql`
-- `backend/src/main/resources/db/seed_dps.sql`
-- `backend/src/main/resources/db/seed_relokacja.sql`
-- `backend/src/main/resources/db/seed_transport.sql`
-- `backend/src/main/resources/db/seed_strefy.sql`
+- `backend/src/main/resources/db/01_schema.sql`
+- `backend/src/main/resources/db/02_seed_dps.sql`       ← jednostki ochrony ludności
+- `backend/src/main/resources/db/03_seed_layers.sql`
+- `backend/src/main/resources/db/04_seed_relokacja.sql`
+- `backend/src/main/resources/db/05_seed_strefy.sql`
+- `backend/src/main/resources/db/06_seed_transport.sql`
 - `.env.example`
 
 **Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (sekcje 1–6), `docs/DEPLOYMENT.md` (sekcje 1–3)
@@ -54,14 +54,14 @@ Deliverable: `curl http://localhost:8080/api/layers` zwraca 7 warstw,
 **Opis:**
 Uruchom PostgreSQL 15 + PostGIS w Dockerze. Stwórz schemat SQL ze wszystkimi tabelami
 z `DATA_SCHEMA.md` §1. Napisz pliki seed dla wszystkich 5 tabel danych.
-`docker-entrypoint-initdb.d` wykonuje pliki automatycznie przy pierwszym starcie.
+`docker-entrypoint-initdb.d` wykonuje pliki numerowane automatycznie przy pierwszym starcie.
 
 **Weryfikacja:**
 ```bash
 docker compose up -d postgres
 sleep 10
 docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM placowka;"
-# oczekiwane: 46
+# oczekiwane: 46+
 
 docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM layer_config;"
 # oczekiwane: 7
@@ -74,7 +74,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT ST_AsTex
 # oczekiwane: POINT(...)
 ```
 
-**Commit:** `feat(1.1): docker-compose + schema SQL + seed files (48 DPS, 7 layers)`
+**Commit:** `feat(1.1): docker-compose + schema SQL + seed files (placówki, 7 warstw)`
 
 ---
 
@@ -272,26 +272,26 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 
 ---
 
-### ✅ 1.7 — Mapa Leaflet z granicami i warstwą DPS
+### ✅ 1.7 — Mapa Leaflet z granicami i warstwą jednostek
 
 **Pliki do stworzenia:**
 - `frontend/src/components/map/MapContainer.tsx`
-- `frontend/src/components/map/AdminBoundaries.tsx`
-- `frontend/src/components/map/layers/DPSLayer.tsx`
+- `frontend/src/components/map/layers/EntityLayer.tsx`    ← (zastąpił DPSLayer)
 - `frontend/src/components/map/layers/ThreatZoneLayer.tsx`
-- `frontend/src/components/map/DPSPopup.tsx`
+- `frontend/src/components/map/EntityPopup.tsx`           ← (zastąpił DPSPopup)
 - `frontend/src/hooks/useLayerData.ts`
+- `frontend/src/hooks/useEntityLayerData.ts`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup DPS, kolory IKE), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
+**Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup placówki, kolory IKE), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
 
 **Opis:**
 `MapContainer` — React-Leaflet, viewport Lublin (51.25, 22.57, zoom 9), podkład OSM.
-`AdminBoundaries` — GeoJSON z `GET /api/layers/L-00`, klik → podświetlenie powiatu.
-`DPSLayer` — markery z `GET /api/layers/L-01`, kolor wg `ike_kategoria`
+`EntityLayer` — markery jednostek ochrony ludności z `GET /api/layers/L-01`, kolor wg `ike_kategoria`
 (czerwony `#EF4444` / żółty `#F59E0B` / zielony `#22C55E`).
-`DPSPopup` — Leaflet Popup (nie modal) z danymi z `properties`.
+`EntityPopup` — Leaflet Popup (nie modal) z danymi z `properties`.
 `ThreatZoneLayer` — poligony z `GET /api/layers/L-03`.
 `useLayerData` — React Query z `staleTime: 60_000`.
+`useEntityLayerData` — hook specyficzny dla entity_registry.
 
 **Weryfikacja:**
 ```
@@ -299,13 +299,13 @@ Manualne — przeglądarka http://localhost:5173:
 ☐ Mapa widoczna, viewport na Lublin
 ☐ Granice powiatów widoczne jako linie
 ☐ Kliknięcie powiatu → podświetlenie
-☐ Markery DPS widoczne — kolory zależne od IKE
+☐ Markery jednostek widoczne — kolory zależne od IKE
 ☐ Kliknięcie markera → Popup z danymi placówki
 ☐ Strefy demo widoczne jako czerwone/żółte poligony
-☐ DevTools Network: GET /api/layers/L-01 → 200, feature_count: 48
+☐ DevTools Network: GET /api/layers/L-01 → 200, feature_count: 46+
 ```
 
-**Commit:** `feat(1.7): MapContainer + AdminBoundaries + DPSLayer + ThreatZoneLayer`
+**Commit:** `feat(1.7): MapContainer + EntityLayer + ThreatZoneLayer + EntityPopup`
 
 ---
 
@@ -414,9 +414,9 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 **Pliki do stworzenia / modyfikacji:**
 - `backend/.../service/AdminBoundaryService.java`
 - `backend/.../controller/GeoController.java` (rozszerzenie obsługi L-08, L-09, L-10)
-- `backend/src/main/resources/db/seed_layers.sql` (dodaj L-08, L-09, L-10)
+- `backend/src/main/resources/db/03_seed_layers.sql` (dodaj L-08, L-09, L-10)
 
-**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§5 — seed_layers, §9), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§3 — 03_seed_layers, §9), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
 
 **Opis:**
 
@@ -868,7 +868,7 @@ Manualne — przeglądarka http://localhost:5173:
 **Opis:**
 `Top10Panel` — lista 10 placówek z najwyższym IKE (z Zustand store, odświeżana przez WebSocket).
 `DecisionPanel` — lista rekomendacji, przyciski "Zatwierdź" / "Odrzuć" (`PATCH /api/decisions/{id}`).
-`FilterPanel` — filtr IKE kategoria + powiat, wpływa na `DPSLayer`.
+`EntityFilterPanel` — filtr IKE kategoria + powiat + typ jednostki, wpływa na `EntityLayer`.
 `EvacuationRoute` — rysuje `trasa_ewakuacji_geojson` jako LineString na mapie po kliknięciu.
 `routingService.ts` — zapytanie do OSRM `router.project-osrm.org`.
 `colorScale.ts` — funkcja `ikeToColor(score)` → hex.
