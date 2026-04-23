@@ -1,25 +1,11 @@
 import type { CSSProperties } from 'react'
-import type { EntityFeatureProperties, IkeCategory } from '../../types/gis'
-
-interface DisplayConfig {
-  label: string
-  color: string
-}
-
-const IKE_DISPLAY: Record<IkeCategory, DisplayConfig> = {
-  czerwony: { label: 'Pilne dzialania', color: '#EF4444' },
-  zolty: { label: 'Podwyzszony priorytet', color: '#F59E0B' },
-  zielony: { label: 'Monitoring', color: '#22C55E' },
-}
-
-const FALLBACK_IKE: DisplayConfig = { label: 'Brak IKE', color: '#6B7280' }
+import type { EntityFeatureProperties } from '../../types/gis'
 
 interface EntityPopupProps {
   properties: EntityFeatureProperties
 }
 
 function EntityPopup({ properties }: EntityPopupProps) {
-  const ike = properties.ike_kategoria ? IKE_DISPLAY[properties.ike_kategoria] ?? FALLBACK_IKE : FALLBACK_IKE
   const residents = asNumber(properties.attributes['liczba_podopiecznych'])
   const capacity = asNumber(properties.attributes['pojemnosc_ogolna'])
   const dependence = asNumber(properties.attributes['niesamodzielni_procent'])
@@ -80,12 +66,6 @@ function EntityPopup({ properties }: EntityPopupProps) {
         </>
       )}
 
-      <hr style={dividerStyle} />
-
-      <div style={{ fontWeight: 600, color: ike.color, marginBottom: 8 }}>
-        IKE: {properties.ike_score != null ? Number(properties.ike_score).toFixed(2) : '-'} · {ike.label}
-      </div>
-
       {(properties.contact_phone || properties.contact_email || properties.www) && (
         <>
           <hr style={dividerStyle} />
@@ -120,22 +100,8 @@ function asNumber(value: unknown): number | null {
   return typeof value === 'number' ? value : null
 }
 
-const dividerStyle: CSSProperties = {
-  border: 'none',
-  borderTop: '1px solid #374151',
-  margin: '8px 0',
-}
-
-const rowStyle: CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginBottom: 4,
-}
-
-const linkStyle: CSSProperties = {
-  color: '#60A5FA',
-  textDecoration: 'none',
-}
+const dividerStyle: CSSProperties = { border: 'none', borderTop: '1px solid #374151', margin: '8px 0' }
+const rowStyle: CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4 }
+const linkStyle: CSSProperties = { color: '#60A5FA', textDecoration: 'none' }
 
 export default EntityPopup

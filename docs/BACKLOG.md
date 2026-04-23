@@ -1,1161 +1,587 @@
-# BACKLOG.md — Plan implementacji
+# BACKLOG — Ogólnopolski Dashboard Jednostek Ochrony Ludności
 
-> Jedyne źródło prawdy dla zadań agentowych.
-> `docs/ARCHITEKTURA_PLAN.md` opisuje *co* i *dlaczego*. Ten plik opisuje *jak* i *kiedy*.
->
-> **Przed każdą sesją:** przeczytaj sekcję "Aktywne zadanie", zaimplementuj, zweryfikuj,
-> zrób commit, zmień status na ✅, zakończ sesję.
+> Jedyne źródło prawdy dla planu implementacji.
+> Czytaj przed każdą sesją implementacyjną.
+> Format statusów: ⬜ Nie rozpoczęta → 🔄 W toku → ✅ Ukończona
 
----
-
-## Statusy
-
-| Symbol | Znaczenie |
-|---|---|
-| ⬜ | Nie rozpoczęte |
-| 🔄 | W toku (aktywna sesja) |
-| ✅ | Ukończone i zcommitowane |
-| ⏸ | Zablokowane (powód w notatce) |
+**Aktywne:** `REVISION 1 — UX fixes`
 
 ---
 
-## Aktywne zadanie
+## ✅ v1.0 — Fundament GIS (ukończona)
 
-> Ustaw tutaj numer zadania przed startem sesji. Jedno zadanie na raz.
-
-**Aktywne:** `1.12 — System powiadomień (Zustand)`
-
----
-
-## Iteracja v1.0 — Fundament GIS
-
-Cel: działająca mapa z DPS-ami, Spring Boot serwuje dane z PostgreSQL przez REST.
-IKE liczone synchronicznie na żądanie (bez eventów — uproszczona wersja na start).
-
-Deliverable: `curl http://localhost:8080/api/layers` zwraca 7 warstw,
-`http://localhost:5173` pokazuje mapę z 48 markerami DPS.
+Wszystkie zadania 1.1–1.12 ukończone. Deliverable:
+- Mapa React-Leaflet + warstwy GIS (AdminBoundaryLayer, EntityLayer)
+- Granice administracyjne PL z GUGiK PRG WFS (AdminBoundaryImportAgent)
+- Entity registry (entity_registry, entity_category, entity_source)
+- Spring Boot 3 / PostGIS / Zustand / Tailwind CSS
+- Powiadomienia importu (notificationStore, WebSocket basic)
 
 ---
 
-### ✅ 1.1 — Infrastruktura bazy danych
+## ✅ REVISION 2 — Usunięcie legacy
 
-**Pliki do stworzenia:**
-- `docker-compose.yml`
-- `backend/src/main/resources/db/01_schema.sql`
-- `backend/src/main/resources/db/02_seed_dps.sql`       ← jednostki ochrony ludności
-- `backend/src/main/resources/db/03_seed_layers.sql`
-- `backend/src/main/resources/db/04_seed_relokacja.sql`
-- `backend/src/main/resources/db/05_seed_strefy.sql`
-- `backend/src/main/resources/db/06_seed_transport.sql`
-- `.env.example`
+> Wykonane przez plan `docs/superpowers/plans/2026-04-22-concept-redesign.md`.
 
-**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (sekcje 1–6), `docs/DEPLOYMENT.md` (sekcje 1–3)
+### ✅ R2.1 — Backend legacy removal
 
-**Opis:**
-Uruchom PostgreSQL 15 + PostGIS w Dockerze. Stwórz schemat SQL ze wszystkimi tabelami
-z `DATA_SCHEMA.md` §1. Napisz pliki seed dla wszystkich 5 tabel danych.
-`docker-entrypoint-initdb.d` wykonuje pliki numerowane automatycznie przy pierwszym starcie.
+Usunięto: Placowka, IkeAgent, IkeResult, IkeController, StrefaZagrozen, MiejsceRelokacji, ZasobTransportu, ike.config.json, seed files 02/04/05/06.
+Zaktualizowano: GeoService.java (bez legacy repos), EntityRegistryService.java (bez ike_score/ike_kategoria), 01_schema.sql (bez legacy tabel), 03_seed_layers.sql (L-01/L-02 dla nowej architektury).
+Weryfikacja: `./mvnw compile -q` → BUILD SUCCESS ✅
 
-**Weryfikacja:**
-```bash
-docker compose up -d postgres
-sleep 10
-docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM placowka;"
-# oczekiwane: 46+
+### ✅ R2.2 — Frontend legacy removal
 
-docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM layer_config;"
-# oczekiwane: 7
+Usunięto: ThreatZoneLayer.tsx, IKE coloring w EntityLayer.tsx, IKE sekcja w EntityPopup.tsx, typy IkeCategory/ThreatZoneProperties w gis.ts.
+Zaktualizowano: MapContainer.tsx (viewport całej Polski), EntityLayer.tsx (CATEGORY_COLORS).
+Weryfikacja: `npm run build` → 0 błędów TypeScript ✅
 
-docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT COUNT(*) FROM strefy_zagrozen;"
-# oczekiwane: 3 (seed demo)
+### ✅ R2.3 — Docs update
 
-# Sprawdź PostGIS
-docker compose exec postgres psql -U lublin -d gis_dashboard -c "SELECT ST_AsText(geom) FROM placowka LIMIT 1;"
-# oczekiwane: POINT(...)
+Zaktualizowano: CLAUDE.md, PRD.md, ARCHITEKTURA_PLAN.md, DATA_SCHEMA.md, API_REFERENCE.md.
+Usunięto: IKE_ALGORITHM.md.
+Weryfikacja: brak słowa "IKE" jako aktywna funkcja w dokumentacji.
+
+---
+
+## ⬜ REVISION 1 — UX fixes
+
+### ⬜ R1.1 — Fix layer selection per warstwa
+
+**Problem:** Jeden `selectedRegion` w mapStore podświetla naraz wiele warstw — po kliknięciu województwa i powiatu oba są podświetlone.
+
+**Pliki do modyfikacji:**
+- `frontend/src/store/mapStore.ts`
+- `frontend/src/components/map/layers/AdminBoundaryLayer.tsx`
+
+**Rozwiązanie:**
+```typescript
+// mapStore.ts — dodaj:
+type BoundaryLayerId = 'L-08' | 'L-09' | 'L-10'
+selectedFeatureByLayer: Record<BoundaryLayerId, string | null>
+setSelectedFeatureForLayer: (layerId: BoundaryLayerId, featureId: string | null) => void
+// setSelectedFeatureForLayer czyści pozostałe warstwy → cross-layer reset stylu
 ```
 
-**Commit:** `feat(1.1): docker-compose + schema SQL + seed files (placówki, 7 warstw)`
+Szczegóły implementacji: Task 9 w `docs/superpowers/plans/2026-04-22-concept-redesign.md`.
+
+**Weryfikacja:**
+```
+☐ Kliknięcie województwa → tylko województwo podświetlone
+☐ Następnie kliknięcie powiatu → powiat podświetlony, województwo traci podświetlenie
+☐ npm run build → 0 błędów TypeScript
+```
+
+**Commit:** `feat(R1): fix layer selection — selectedFeatureByLayer, cross-layer style reset`
 
 ---
 
-### ✅ 1.2 — Setup Spring Boot
+## ⬜ DŁUG TECHNICZNY — Logi i testy
 
-**Pliki do stworzenia:**
-- `backend/pom.xml`
-- `backend/src/main/java/pl/lublin/dashboard/DashboardApplication.java`
-- `backend/src/main/resources/application.yml`
-- `backend/src/main/resources/application-dev.yml`
-- `backend/src/main/java/pl/lublin/dashboard/config/DataSourceConfig.java`
-- `backend/src/main/java/pl/lublin/dashboard/config/CorsConfig.java`
+### ⬜ DT-LOGS-TESTS — Logi + testy dla istniejących serwisów
 
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (sekcje 1, 6), `docs/DEPLOYMENT.md` (§10)
+**Pliki do modyfikacji (dodaj logi + testy):**
+- `backend/.../agent/AdminBoundaryImportAgent.java`
+- `backend/.../service/EntityImportService.java`
+- `backend/.../service/EntityRegistryService.java`
+- `backend/.../service/AdminBoundaryService.java`
+- `backend/.../service/GeoService.java` (już ma Logger — dodaj logi do key metod)
 
-**Opis:**
-Spring Boot 3.x, OpenJDK 21. Zależności Maven: `spring-boot-starter-web`,
-`spring-boot-starter-data-jpa`, `postgresql`, `hibernate-spatial`, `spring-boot-starter-websocket`.
-Profil `dev`: baza na `localhost:5432`, CORS dla `http://localhost:5173`.
+**Pliki do stworzenia (testy):**
+- `backend/src/test/java/pl/lublin/dashboard/service/EntityRegistryServiceTest.java`
+- `backend/src/test/java/pl/lublin/dashboard/service/AdminBoundaryServiceTest.java`
+- `backend/src/test/java/pl/lublin/dashboard/agent/AdminBoundaryImportAgentTest.java`
+
+**Wzorzec logowania:**
+```java
+private static final Logger log = LoggerFactory.getLogger(X.class);
+log.info("[AdminBoundaryImportAgent] import started — poziomy={}", Arrays.toString(poziomy));
+log.info("[AdminBoundaryImportAgent] import completed — inserted={}", count);
+log.error("[AdminBoundaryImportAgent] import failed — {}", e.getMessage());
+```
+
+**Wzorzec testu:**
+```java
+@ExtendWith(MockitoExtension.class)
+class EntityRegistryServiceTest {
+    @Mock EntityRegistryEntryRepository entityRepository;
+    @InjectMocks EntityRegistryService service;
+
+    @Test
+    void filterEntries_byKodWoj_returnsOnlyMatchingEntries() {
+        EntityRegistryEntry match = new EntityRegistryEntry();
+        match.setTerytWoj("06");
+        EntityRegistryEntry noMatch = new EntityRegistryEntry();
+        noMatch.setTerytWoj("14");
+        when(entityRepository.findAll()).thenReturn(List.of(match, noMatch));
+
+        Map<String, Object> result = service.getEntities(null, null, "06", null, null, null, null);
+
+        assertThat((Integer) result.get("count")).isEqualTo(1);
+    }
+}
+```
 
 **Weryfikacja:**
 ```bash
 cd backend
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-# Oczekiwane w logach: "Started DashboardApplication in X seconds"
-
-curl -s http://localhost:8080/actuator/health | jq .status
-# oczekiwane: "UP"
+./mvnw test -Dtest="EntityRegistryServiceTest,AdminBoundaryServiceTest,AdminBoundaryImportAgentTest" -q
+# oczekiwane: BUILD SUCCESS
 ```
 
-**Commit:** `feat(1.2): Spring Boot 3 setup — pom.xml, DataSource, CORS`
+**Commit:** `test(DT): logi + testy jednostkowe dla istniejących serwisów`
 
 ---
 
-### ✅ 1.3 — Setup frontend (Vite + React + Leaflet)
+## ⬜ v1.1 — Zasoby + Alerty zagrożeń
 
-**Pliki do stworzenia:**
-- `frontend/package.json`
-- `frontend/vite.config.ts`
-- `frontend/tailwind.config.js`
-- `frontend/src/main.tsx`
-- `frontend/src/App.tsx`
-- `frontend/src/services/api.ts`
-- `frontend/src/components/layout/AppShell.tsx`
-- `frontend/src/components/layout/Header.tsx`
+**Cel:** Operator widzi zasoby każdej jednostki na mapie i może filtrować po typie zasobu. Alert z IMGW (poziom wody > próg) automatycznie podświetla jednostki w zasięgu.
 
-**Dokumenty referencyjne:** `CLAUDE.md` (sekcja Stack technologiczny, Layout aplikacji)
-
-**Opis:**
-Vite + React 18 + Tailwind CSS. Zależności npm: `react-leaflet`, `leaflet`, `zustand`,
-`@tanstack/react-query`, `axios`.
-Layout 70/30: mapa po lewej (placeholder `<div>`), panel boczny po prawej (Do wykonania w przyszłym zadaniu)
-`api.ts` — klient axios z `baseURL` z `VITE_API_BASE_URL`.
-Ciemny motyw: `bg-gray-900`.
-
-**Weryfikacja:**
-```bash
-cd frontend
-npm install
-npm run build   # 0 błędów
-npm run dev
-# http://localhost:5173 — widoczny layout z headerem
-# DevTools: brak błędów konsoli
-```
-
-**Commit:** `feat(1.3): Vite + React 18 + Tailwind — AppShell, Header, api.ts`
+**Deliverable:** `GET /api/resource-types` zwraca typy zasobów; kliknięcie jednostki pokazuje jej zasoby w popupie; aktywny alert z IMGW podświetla jednostki w zasięgu w ciągu 30 sekund bez odświeżenia strony.
 
 ---
 
-### ✅ 1.4 — Encje JPA i repozytoria
-
-**Pliki do stworzenia:**
-- `backend/.../model/Placowka.java`
-- `backend/.../model/LayerConfig.java`
-- `backend/.../model/StrefaZagrozen.java`
-- `backend/.../model/MiejsceRelokacji.java`
-- `backend/.../model/ZasobTransportu.java`
-- `backend/.../repository/PlacowkaRepository.java`
-- `backend/.../repository/LayerConfigRepository.java`
-- `backend/.../repository/StrefaZagrozenRepository.java`
-
-**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§1 — DDL każdej tabeli)
-
-**Opis:**
-Encje JPA mapowane na tabele z `schema.sql`. Geometrie przez Hibernate Spatial
-(`org.locationtech.jts.geom.Point`, `Polygon`, `LineString`). Repozytoria jako
-`JpaRepository`. Żadnej logiki biznesowej w encjach — tylko mapping.
-
-**Weryfikacja:**
-```bash
-./mvnw compile -q
-# 0 błędów kompilacji
-
-# Test że encje ładują się z bazy:
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev &
-sleep 8
-curl -s http://localhost:8080/actuator/health
-# Brak błędów Hibernate w logach (grep "ERROR" w output mvnw)
-```
-
-Dodatkowo: pliki cmd uruchamiające aplikacje za pomocą dockera:
-start-all.cmd (uruchamia docker-compose.full.yml)
-i
-start-dev.cmd (uruchamia docker-compose.yml)
-
-**Commit:** `feat(1.4): encje JPA — Placowka, LayerConfig, StrefaZagrozen, repozytoria`
-
----
-
-### ✅ 1.5 — GeoService + GeoJSON granic + endpoint warstw
-
-**Pliki do stworzenia:**
-- `backend/.../service/GeoService.java`
-- `backend/.../controller/GeoController.java`
-- `backend/.../controller/LayerConfigController.java`
-- `backend/src/main/resources/geojson/lublin_powiaty.geojson`
-- `backend/src/main/resources/geojson/lublin_gminy.geojson`
-
-**Dokumenty referencyjne:** `docs/API_REFERENCE.md` (`GET /api/layers`, `GET /api/layers/{id}`), `docs/DATA_SCHEMA.md` (§7)
-
-**Opis:**
-`GeoService` ładuje GeoJSON granic z classpath (`geojson/`). `GeoController` serwuje:
-- `GET /api/layers` — lista `LayerConfig` z bazy
-- `GET /api/layers/L-00` — GeoJSON granic administracyjnych (z pliku, nie z bazy)
-- `GET /api/layers/{id}` — dane GeoJSON warstwy L-01…L-07 z bazy jako FeatureCollection
-
-Pobierz pliki granic zgodnie z instrukcją w `DATA_SCHEMA.md` §7 (GADM 4.1).
-Jeśli GADM niedostępny — użyj bounding box fallback z `DATA_SCHEMA.md` §7.
-
-Format odpowiedzi: dokładnie jak w `API_REFERENCE.md` §`GET /api/layers/{id}`.
-
-**Weryfikacja:**
-```bash
-curl -s http://localhost:8080/api/layers | jq '. | length'
-# oczekiwane: 7
-
-curl -s http://localhost:8080/api/layers/L-01 | jq '.feature_count'
-# oczekiwane: 48
-
-curl -s http://localhost:8080/api/layers/L-00 | jq '.type'
-# oczekiwane: "FeatureCollection"
-
-curl -s http://localhost:8080/api/layers/L-99 | jq .code
-# oczekiwane: "LAYER_NOT_FOUND"
-```
-
-**Commit:** `feat(1.5): GeoService + GeoController — GET /api/layers, granice administracyjne`
-
----
-
-### ✅ 1.6 — IkeAgent (wersja synchroniczna) + IkeController
-
-**Pliki do stworzenia:**
-- `backend/.../agent/IkeAgent.java` (wersja v1.0 — bez eventów, wywołanie synchroniczne)
-- `backend/.../controller/IkeController.java`
-- `backend/src/main/resources/ike.config.json`
-- `backend/.../model/IkeResult.java`
-- `backend/.../repository/IkeResultRepository.java`
-
-**Dokumenty referencyjne:** `docs/IKE_ALGORITHM.md` (cały dokument), `docs/DATA_SCHEMA.md` (§8), `docs/API_REFERENCE.md` (`GET /api/ike`, `GET /api/ike/{kod}`, `GET /api/ike/config`)
-
-**Opis:**
-W v1.0 `IkeAgent` jest zwykłym `@Service` wywoływanym synchronicznie przez kontroler
-(bez `@EventListener` — to przychodzi w zadaniu 2.3).
-Zaimplementuj pełny algorytm IKE z `IKE_ALGORITHM.md` — wszystkie 5 score'ów,
-edge case'y z tabeli §6, zapis do `ike_results`.
-Wczytaj `ike.config.json` przez `ClassPathResource` w `@PostConstruct`.
-
-`IkeController`: `GET /api/ike`, `GET /api/ike/{kod}`, `GET /api/ike/config`.
-
-**Weryfikacja:**
-```bash
-# Przelicz IKE dla wszystkich placówek
-curl -s -X POST http://localhost:8080/api/ike/recalculate
-sleep 5
-
-# Sprawdź wyniki
-curl -s "http://localhost:8080/api/ike?limit=3" | jq '.wyniki[0].ike_score'
-# oczekiwane: liczba 0.0–1.0
-
-# Placówka w strefie demo powinna mieć score_zagrozenia > 0
-curl -s "http://localhost:8080/api/ike/DPS-CHE-002" | jq '.skladowe.score_zagrozenia'
-# oczekiwane: > 0 (DPS w Sawinie jest w DEMO-POWODZ-001)
-
-# Konfiguracja
-curl -s http://localhost:8080/api/ike/config | jq '.wagi.zagrozenie'
-# oczekiwane: 0.35
-
-# Sprawdź zapis do bazy
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT placowka_kod, ike_score, ike_kategoria FROM ike_results ORDER BY ike_score DESC LIMIT 5;"
-```
-
-**Commit:** `feat(1.6): IkeAgent synchroniczny + IkeController + ike.config.json`
-
----
-
-### ✅ 1.7 — Mapa Leaflet z granicami i warstwą jednostek
-
-**Pliki do stworzenia:**
-- `frontend/src/components/map/MapContainer.tsx`
-- `frontend/src/components/map/layers/EntityLayer.tsx`    ← (zastąpił DPSLayer)
-- `frontend/src/components/map/layers/ThreatZoneLayer.tsx`
-- `frontend/src/components/map/EntityPopup.tsx`           ← (zastąpił DPSPopup)
-- `frontend/src/hooks/useLayerData.ts`
-- `frontend/src/hooks/useEntityLayerData.ts`
-
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, Popup placówki, kolory IKE), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
-
-**Opis:**
-`MapContainer` — React-Leaflet, viewport Lublin (51.25, 22.57, zoom 9), podkład OSM.
-`EntityLayer` — markery jednostek ochrony ludności z `GET /api/layers/L-01`, kolor wg `ike_kategoria`
-(czerwony `#EF4444` / żółty `#F59E0B` / zielony `#22C55E`).
-`EntityPopup` — Leaflet Popup (nie modal) z danymi z `properties`.
-`ThreatZoneLayer` — poligony z `GET /api/layers/L-03`.
-`useLayerData` — React Query z `staleTime: 60_000`.
-`useEntityLayerData` — hook specyficzny dla entity_registry.
-
-**Weryfikacja:**
-```
-Manualne — przeglądarka http://localhost:5173:
-☐ Mapa widoczna, viewport na Lublin
-☐ Granice powiatów widoczne jako linie
-☐ Kliknięcie powiatu → podświetlenie
-☐ Markery jednostek widoczne — kolory zależne od IKE
-☐ Kliknięcie markera → Popup z danymi placówki
-☐ Strefy demo widoczne jako czerwone/żółte poligony
-☐ DevTools Network: GET /api/layers/L-01 → 200, feature_count: 46+
-```
-
-**Commit:** `feat(1.7): MapContainer + EntityLayer + ThreatZoneLayer + EntityPopup`
-
----
-
-### ✅ 1.8 — Panele boczne v1.0
-
-**Pliki do stworzenia:**
-- `frontend/src/components/panels/LayerControlPanel.tsx`
-- `frontend/src/components/panels/RegionInfoPanel.tsx`
-- `frontend/src/store/mapStore.ts`
-
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout aplikacji), `docs/API_REFERENCE.md` (`GET /api/layers`)
-
-**Opis:**
-`LayerControlPanel` — lista warstw z `GET /api/layers`, toggle włącz/wyłącz każdą,
-znacznik czasu ostatniej aktualizacji.
-`RegionInfoPanel` — statystyki klikniętego regionu (liczba placówek, suma podopiecznych).
-`mapStore` (Zustand) — aktywne warstwy, wybrany region.
-Panel boczny zwijany (`<<` przycisk).
-
-**Weryfikacja:**
-```
-Manualne:
-☐ LayerControlPanel wyświetla 7 warstw z nazwami
-☐ Toggle warstwy włącza/wyłącza markery/poligony na mapie
-☐ Kliknięcie powiatu → RegionInfoPanel pokazuje statystyki
-☐ Przycisk "<<" zwija panel — mapa zajmuje pełną szerokość
-```
-
-**Commit:** `feat(1.8): LayerControlPanel + RegionInfoPanel + Zustand mapStore`
-
----
-
-### ✅ 1.9 — Tabela granice_administracyjne + AdminBoundaryImportAgent (PRG WFS)
-
-**Pliki do stworzenia / modyfikacji:**
-- `backend/src/main/resources/db/schema.sql` (dodaj tabelę `granice_administracyjne`)
-- `backend/.../model/AdminBoundaryBoudries.java`
-- `backend/.../repository/AdminBoundaryRepository.java`
-- `backend/.../agent/AdminBoundaryImportAgent.java`
-- `backend/.../controller/AdminBoundaryController.java`
-
-**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§1 — nowa tabela, §9), `docs/API_REFERENCE.md` (`POST /api/admin-boundaries/import`)
-
-**Opis:**
-
-Nowa tabela `granice_administracyjne` przechowuje granice administracyjne całej Polski
-na trzech poziomach: województwo (16), powiat (~380), gmina (~2500).
-Źródłem danych jest **GUGiK PRG WFS** (Państwowy Rejestr Granic):
-
-```
-URL: https://mapy.geoportal.gov.pl/wss/service/PZGIK/PRG/WFS/AdministrativeDivision
-TypeName poziomów:
-  ms:A02_Granice_Wojewodztw   → poziom 'wojewodztwo'
-  ms:A03_Granice_Powiatow     → poziom 'powiat'
-  ms:A04_Granice_Gmin         → poziom 'gmina'
-CRS źródłowy: EPSG:2180 (PUWG 1992) — transformacja do EPSG:4326 przez GeoTools
-```
-
-`AdminBoundaryImportAgent` to zwykły `@Service` wywoływany synchronicznie przez kontroler
-(import trwa ~2-5 min — odpowiedź 202, agent działa w osobnym wątku `@Async`).
-Kolejność importu: najpierw województwa, potem powiaty, potem gminy.
-Import jest idempotentny: przed zapisem usuwa istniejące rekordy danego `poziom`.
-
-**Nie implementuj** w tym zadaniu endpointów GET dla danych granic — to zadanie 1.10.
-
-`POST /api/admin-boundaries/import` zwraca 202 z body:
-```json
-{ "status": "started", "poziomy": ["wojewodztwo", "powiat", "gmina"], "correlation_id": "..." }
-```
-
-**Weryfikacja:**
-```bash
-./mvnw compile -q
-
-# Uruchom import (trwa kilka minut)
-curl -s -X POST http://localhost:8080/api/admin-boundaries/import | jq .status
-# oczekiwane: "started"
-
-sleep 300  # poczekaj na zakończenie
-
-# Sprawdź wyniki
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT poziom, COUNT(*) FROM granice_administracyjne GROUP BY poziom ORDER BY poziom;"
-# oczekiwane:
-#  gmina        | ~2477
-#  powiat        | ~380
-#  wojewodztwo   | 16
-
-# Sprawdź SRID i geometrię
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT ST_SRID(geom), ST_AsText(ST_Centroid(geom)) FROM granice_administracyjne
-      WHERE poziom='wojewodztwo' AND nazwa ILIKE '%lubel%';"
-# SRID: 4326, centroid w okolicach (22-23°E, 51°N)
-```
-
-**Potencjalne usprawnienia (dług techniczny — nie implementuj teraz):**
-- Podwójna geometria: `geom` (pełna) + `geom_uproszczona` (ST_Simplify ~100m) dla wydajności frontendu
-- `@Scheduled` roczny autorefresh granic
-
-**Commit:** `feat(1.9): granice_administracyjne + AdminBoundaryImportAgent (PRG WFS)`
-
----
-
-### ✅ 1.10 — API: warstwy L-08/L-09/L-10 (granice administracyjne całej Polski)
-
-**Pliki do stworzenia / modyfikacji:**
-- `backend/.../service/AdminBoundaryService.java`
-- `backend/.../controller/GeoController.java` (rozszerzenie obsługi L-08, L-09, L-10)
-- `backend/src/main/resources/db/03_seed_layers.sql` (dodaj L-08, L-09, L-10)
-
-**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (§3 — 03_seed_layers, §9), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
-
-**Opis:**
-
-Trzy nowe warstwy w `layer_config`:
-
-| ID | Poziom | Domyślnie | Opis |
-|---|---|---|---|
-| `L-08` | `wojewodztwo` | ✅ włączona | 16 granic województw |
-| `L-09` | `powiat` | ❌ wyłączona | ~380 granic powiatów |
-| `L-10` | `gmina` | ❌ wyłączona | ~2477 granic gmin |
-
-`AdminBoundaryService` odpowiada za zapytania do `granice_administracyjne`:
-- `GET /api/layers/L-08` → wszystkie województwa (brak filtrów, zawsze 16 features)
-- `GET /api/layers/L-09` → powiaty; opcjonalny `?kod_woj=06` filtruje do województwa (zalecane przy dużych zbiorach)
-- `GET /api/layers/L-10` → gminy; **wymagany** `?kod_woj=XX` lub `?bbox=...` — bez filtra zwróć 400 z `FILTER_REQUIRED`
-
-Każda feature w FeatureCollection zawiera properties:
-```json
-{
-  "kod_teryt": "0601011",
-  "nazwa": "Lublin",
-  "poziom": "gmina",
-  "kod_nadrzedny": "0601"
+### ⬜ 2.1 — SQL: resource_type + entity_resources + threat_alert
+
+**Pliki:**
+- `backend/src/main/resources/db/01_schema.sql` (dodaj 3 tabele)
+- `backend/.../model/ResourceType.java`
+- `backend/.../model/EntityResource.java`
+- `backend/.../model/ThreatAlert.java`
+- `backend/.../repository/ResourceTypeRepository.java`
+- `backend/.../repository/EntityResourceRepository.java`
+- `backend/.../repository/ThreatAlertRepository.java`
+
+**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (sekcje resource_type, entity_resources, threat_alert)
+
+**Encja JPA — przykład EntityResource:**
+```java
+@Entity
+@Table(name = "entity_resources")
+public class EntityResource {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Column(name = "entity_id", nullable = false) private Long entityId;
+    @Column(name = "resource_type_code", nullable = false) private String resourceTypeCode;
+    @Column(nullable = false) private Integer quantity;
+    @Column(name = "is_available") private Boolean isAvailable = true;
+    @Column(name = "last_updated") private OffsetDateTime lastUpdated;
+    private String source;
+    // getters/setters
 }
 ```
 
-Rozszerz istniejący `GeoController.getLayerById()` o delegację do `AdminBoundaryService`
-dla ID `L-08`, `L-09`, `L-10`. Zachowaj istniejącą obsługę L-00…L-07 bez zmian.
-
-Operacja PostGIS do filtrowania po bbox:
-```sql
-WHERE poziom = :poziom
-AND (:bbox IS NULL OR ST_Intersects(geom, ST_MakeEnvelope(:xmin,:ymin,:xmax,:ymax,4326)))
-AND (:kod_woj IS NULL OR LEFT(kod_teryt, 2) = :kod_woj)
-```
-
 **Weryfikacja:**
 ```bash
-# Lista warstw — powinna pokazać 10 pozycji (7 + 3 nowe)
-curl -s http://localhost:8080/api/layers | jq '. | length'
-# oczekiwane: 10
+./mvnw compile -q  # BUILD SUCCESS
 
-# Województwa — 16 features
-curl -s http://localhost:8080/api/layers/L-08 | jq '.feature_count'
-# oczekiwane: 16
-
-# Powiaty z filtrem województwa lubelskiego (kod 06)
-curl -s "http://localhost:8080/api/layers/L-09?kod_woj=06" | jq '.feature_count'
-# oczekiwane: 24 (powiaty woj. lubelskiego)
-
-# Gminy bez filtra — powinno zwrócić błąd
-curl -s http://localhost:8080/api/layers/L-10 | jq .code
-# oczekiwane: "FILTER_REQUIRED"
-
-# Gminy z filtrem
-curl -s "http://localhost:8080/api/layers/L-10?kod_woj=06" | jq '.feature_count'
-# oczekiwane: ~213 (gminy woj. lubelskiego)
-
-# properties jednej cechy
-curl -s http://localhost:8080/api/layers/L-08 | jq '.features[0].properties'
-# oczekiwane: obiekt z kod_teryt, nazwa, poziom, kod_nadrzedny
-```
-
-**Commit:** `feat(1.10): AdminBoundaryService + GET /api/layers/L-08,L-09,L-10`
-
----
-
-### ✅ 1.11 — Frontend: AdminBoundaryLayer wielopoziomowy + RegionInfoPanel update
-
-**Pliki do stworzenia / modyfikacji:**
-- `frontend/src/components/map/layers/AdminBoundaryLayer.tsx` (nowy, zastępuje AdminBoundaries.tsx)
-- `frontend/src/components/map/MapContainer.tsx` (zamień AdminBoundaries → AdminBoundaryLayer)
-- `frontend/src/store/mapStore.ts` (L-08: true, L-09: false, L-10: false)
-- `frontend/src/components/panels/RegionInfoPanel.tsx` (dodaj kod TERYT, obsługa spoza Lubelskiego)
-- `frontend/src/hooks/useAdminBoundaries.ts` (hook z logiką filtrowania)
-
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory), `docs/API_REFERENCE.md` (`GET /api/layers/L-08`, `L-09`, `L-10`)
-
-**Opis:**
-
-`AdminBoundaryLayer` renderuje trzy niezależne warstwy Leaflet GeoJSON — po jednej
-na każdy poziom administracyjny. Widoczność każdej kontrolowana przez `activeLayers`
-w Zustand store.
-
-Styl warstw:
-```
-L-08 województwa:  kolor #6366F1, weight 2, fillOpacity 0.04
-L-09 powiaty:      kolor #4B5563, weight 1, fillOpacity 0.03
-L-10 gminy:        kolor #374151, weight 0.5, fillOpacity 0.02
-```
-
-Przy kliknięciu regionu — niezależnie od poziomu — wyświetlany styl:
-```
-kolor #60A5FA, weight 2.5, fillOpacity 0.15
-```
-oraz zapis do `setSelectedRegion({ name: feature.properties.nazwa, kod_teryt: feature.properties.kod_teryt, poziom: feature.properties.poziom, properties: ... })`.
-
-`useAdminBoundaries(poziom, kodWoj?)` — hook opakowujący `useLayerData` z dynamicznym
-queryKey uwzględniającym filtr `kod_woj`. L-10 zawsze wymaga `kod_woj`.
-
-`RegionInfoPanel` — rozszerzenie:
-- Wyświetl `kod_teryt` i `poziom` dla każdego regionu
-- Gdy powiat/gmina poza woj. lubelskim: wyświetl nazwę + TERYT + tekst
-  „Brak danych placówek dla tego regionu"
-- Gdy powiat/gmina woj. lubelskiego (`kod_teryt` zaczyna się od `06`):
-  statystyki placówek jak dotychczas
-
-**Nie usuwaj** `AdminBoundaries.tsx` — oznacz go jako `@deprecated` w komentarzu
-na górze pliku. Usunięcie planowane po zakończeniu zadania 1.11.
-
-**Weryfikacja:**
-```
-Manualne — przeglądarka http://localhost:5173:
-☐ Przy starcie widoczne tylko granice województw (L-08 domyślnie włączona)
-☐ Włączenie L-09 → pojawiają się granice powiatów
-☐ Włączenie L-10 → pojawiają się granice gmin (może być wolne — to OK)
-☐ Kliknięcie województwa → RegionInfoPanel: nazwa + TERYT 2-znakowy
-☐ Kliknięcie powiatu lubelskiego → statystyki DPS w panelu
-☐ Kliknięcie powiatu mazowieckiego → "Brak danych placówek dla tego regionu"
-☐ Wyłączenie L-09 → granice powiatów znikają z mapy
-☐ npm run build → 0 błędów TypeScript
-```
-
-**Potencjalne usprawnienia (dług techniczny — nie implementuj teraz):**
-- Lazy loading: L-09 i L-10 ładuj dopiero po włączeniu toggle (useLayerData z `enabled: isActive`)
-- Uproszczone geometrie (`geom_uproszczona`) gdy gminy będą zbyt wolne
-
-**Commit:** `feat(1.11): AdminBoundaryLayer wielopoziomowy + RegionInfoPanel TERYT`
-
----
-
-### ✅ 1.12 — System powiadomień (Zustand)
-
-**Pliki stworzone/zmodyfikowane:**
-- `frontend/src/store/notificationStore.ts` — store Zustand: `Notification`, `NotificationType`, `addNotification`, `removeNotification`, `clearNotifications`, auto-usuwanie po `duration` ms
-- `frontend/src/components/layout/NotificationList.tsx` — lista powiadomień z kolorami wg `NotificationType`
-- `frontend/src/hooks/importAdminBoundaries.ts` — integracja: powiadomienie na start importu + blokada podwójnego kliknięcia
-
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory, zasady UI)
-
-**Opis:**
-`notificationStore` przechowuje tablicę `Notification[]`. Każde powiadomienie ma `status: NotificationType` (`success` | `error` | `info` | `warning`). `addNotification` generuje `id = crypto.randomUUID()`, opcjonalnie ustawia `setTimeout` na `removeNotification` po `duration` ms.
-
-`NotificationList` renderowany absolutnie nad mapą (`top-20 right-4 z-[1001]`). Kolor tła i tytułu zależy od `status`:
-- `success` → `bg-green-900 / text-green-300`
-- `error`   → `bg-red-900 / text-red-300`
-- `info`    → `bg-blue-900 / text-blue-300`
-- `warning` → `bg-yellow-900 / text-yellow-300`
-
-`importAdminBoundaries` używa `useNotificationStore.getState()` (Zustand poza hookiem React).
-Moduł-level `isRunning: boolean` blokuje podwójne wywołanie — przy ponownym kliknięciu wyświetla powiadomienie WARNING.
-
-**Integracja WebSocket (TODO — zadanie 2.5/2.6):**
-Docelowo `LiveFeedService` będzie pushował do `/topic/system` zdarzenia:
-- `ADMIN_IMPORT_STARTED` → `addNotification(INFO)`
-- `ADMIN_IMPORT_COMPLETED` → `addNotification(SUCCESS)`
-- `ADMIN_IMPORT_FAILED` → `addNotification(ERROR)`
-
-Hook `useWebSocket` (zadanie 2.6) odbierze te wiadomości i wywoła `addNotification` z `notificationStore`.
-Wtedy `isRunning` lock i powiadomienia optimistyczne z `importAdminBoundaries.ts` należy usunąć.
-Do tego momentu stan importu jest zarządzany client-side.
-
-**Weryfikacja:**
-```
-Manualne — przeglądarka:
-☐ Kliknięcie "Import danych terytorialnych" → powiadomienie INFO "Import rozpoczęty"
-☐ Ponowne kliknięcie podczas importu → powiadomienie WARNING "Import w toku"
-☐ Po zakończeniu → powiadomienie SUCCESS (lub ERROR jeśli backend niedostępny)
-☐ Powiadomienia z duration znikają automatycznie
-☐ Kliknięcie × usuwa powiadomienie
-☐ Kolory pasują do typu (zielony/czerwony/niebieski/żółty)
-☐ npm run build — 0 błędów TypeScript
-```
-
-**Commit:** `feat(1.12): notificationStore + NotificationList + importAdminBoundaries z powiadomieniami`
-
----
-
-### REVISION 1
-Przygotuj plan poprawy długu technicznego/błędów/potencjalnych kroków rozwoju (nie implementuj od razu - do review).
-
-Jak dotąd zauważone funkcjonalności do poprawy:
-* Boczny pasek - <LayerControlPanel /> - dziwnie zachowuje się w przypadku zwijania/zachowania. Mimo zwinięcia, przysłania poligony/dps-y narysowane na mapie.
-Chciałbym, aby boczne menu bardziej "nachodziło" na mapę, niż aby tworzyło własną zamkniętą przestrzeń. Funkcjonalność zwijania - niech pozostanie.
-* Brakuje opcji włączania/wyłączanie poszczególnych warstw terytorialnych. Województwa są (słusznie) domyślnie włączone, ale nie da się ich schować poprzez toggle on/off
-* Chcę zmienić domyślą lokalizację startową mapy na widok całej polski (nie jest już to dashboard tylko dla lublina), co wymaga również zmiany zoom-a
-* Zbadać, czy to możliwe aby ograniczyć możliwość zoom-out oraz poruszania się po całej mapie (wystarczy tylko widok Polski); choć oczywiście chcę dać możliwość zoom in/poruszania się po mapie
-
----
-
-## Iteracja v1.1 — Event-driven core
-
-Cel: pełny flow — wybór scenariusza przez operatora uruchamia automatyczny łańcuch
-ThreatUpdatedEvent → IKE → IkeRecalculatedEvent → rekomendacje → WebSocket push do UI.
-
-Deliverable: po kliknięciu "Aktywuj scenariusz Q100 / powiat chełmski" mapa
-aktualizuje się automatycznie w ciągu 30 sekund bez odświeżenia strony.
-
----
-
-### ⬜ 2.1 — Klasy eventów + AsyncConfig
-
-**Pliki do stworzenia:**
-- `backend/.../event/ThreatUpdatedEvent.java`
-- `backend/.../event/IkeRecalculatedEvent.java`
-- `backend/.../event/IkeResultSummary.java`
-- `backend/.../config/AsyncConfig.java`
-
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.1, §4.1a, §6)
-
-**Opis:**
-`ThreatUpdatedEvent` i `IkeRecalculatedEvent` dokładnie jak w `ARCHITEKTURA_PLAN.md` §4.1 i §4.1a.
-`AsyncConfig` — `ThreadPoolTaskExecutor` z `corePoolSize=3`, `maxPoolSize=6`,
-`queueCapacity=25`, prefix wątków `"agent-"`, bean name `"agentTaskExecutor"`.
-`@EnableAsync` na klasie konfiguracyjnej.
-
-**Weryfikacja:**
-```bash
-./mvnw compile -q
-# 0 błędów — klasy eventów kompilują się poprawnie
-```
-
-**Commit:** `feat(2.1): ThreatUpdatedEvent + IkeRecalculatedEvent + AsyncConfig`
-
----
-
-### ⬜ 2.2 — IkeAgent refaktor na @EventListener
-
-**Pliki do modyfikacji:**
-- `backend/.../agent/IkeAgent.java` — zmiana z `@Service` na `@EventListener @Async`
-
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.3), `docs/IKE_ALGORITHM.md` (§2, §11)
-
-**Opis:**
-Refaktoruj `IkeAgent` z v1.0 (synchroniczny `@Service`) na event-driven listener.
-Dodaj metodę `onThreatUpdated(@EventListener @Async ThreatUpdatedEvent)`.
-Po obliczeniu wszystkich IKE: `publisher.publishEvent(new IkeRecalculatedEvent(...))`.
-Zachowaj `@PostConstruct` dla wczytywania `ike.config.json`.
-Zachowaj endpoint `POST /api/ike/recalculate` — teraz publikuje event zamiast wywoływać wprost.
-Dodaj obsługę E13 (409 gdy obliczanie już trwa) — `AtomicBoolean isRunning`.
-
-**Weryfikacja:**
-```bash
-# Start backendu
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev &
-sleep 8
-
-# Wywołaj recalculate (publikuje ThreatUpdatedEvent)
-curl -s -X POST http://localhost:8080/api/ike/recalculate | jq .status
-# oczekiwane: "started"
-
-# Poczekaj na async obliczenia
+docker compose up -d postgres
 sleep 10
-
-# Sprawdź wyniki w bazie
 docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT COUNT(*) FROM ike_results WHERE ike_score IS NOT NULL;"
-# oczekiwane: > 40
-
-# Test 409 — drugi call podczas obliczania
-curl -s -X POST http://localhost:8080/api/ike/recalculate
-curl -s -X POST http://localhost:8080/api/ike/recalculate | jq .code
-# oczekiwane: "RECALCULATE_IN_PROGRESS" (jeśli pierwsze jeszcze trwa)
-
-# Sprawdź logi — correlation_id powinien być widoczny
-# grep "IkeAgent" w logach backendu
+  -c "\dt" | grep -E "resource_type|entity_resources|threat_alert"
+# oczekiwane: 3 tabele widoczne
 ```
 
-**Commit:** `feat(2.2): IkeAgent refaktor — @EventListener @Async + IkeRecalculatedEvent publish`
+**Commit:** `feat(2.1): SQL schema — resource_type, entity_resources, threat_alert`
 
 ---
 
-### ⬜ 2.3 — DecisionAgent
+### ⬜ 2.2 — Seed: typy zasobów + mockowane zasoby
 
-**Pliki do stworzenia:**
-- `backend/.../agent/DecisionAgent.java`
-- `backend/.../model/EvacuationDecision.java`
-- `backend/.../repository/EvacuationDecisionRepository.java`
-- `backend/.../controller/DecisionController.java`
+**Pliki:**
+- `backend/src/main/resources/db/07_seed_resource_types.sql`
+- `backend/src/main/resources/db/08_seed_entity_resources.sql`
 
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.4, §7), `docs/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
+**07_seed_resource_types.sql (~50 typów):**
+```sql
+INSERT INTO resource_type (code, name, category, unit_of_measure) VALUES
+  ('woz_cysternowy',       'Wóz cysternowy GBA',           'pojazd_gasniczy',   'szt'),
+  ('woz_drabinowy',        'Wóz drabinowy',                'pojazd_gasniczy',   'szt'),
+  ('woz_ratownictwa',      'Wóz ratownictwa technicznego', 'pojazd_ratowniczy', 'szt'),
+  ('ponton_motorowy',      'Ponton motorowy',              'sprzet_wodny',      'szt'),
+  ('ponton_wioslowy',      'Ponton wiosłowy',              'sprzet_wodny',      'szt'),
+  ('pompa_szlamowa',       'Pompa szlamowa',               'sprzet_wodny',      'szt'),
+  ('agregat_pradotworczy', 'Agregat prądotwórczy',         'energetyczny',      'szt'),
+  ('oswietlenie_polowe',   'Oświetlenie polowe',           'energetyczny',      'kpl'),
+  ('nosze_transportowe',   'Nosze transportowe',           'medyczny',          'szt'),
+  ('defibrylator_aed',     'Defibrylator AED',             'medyczny',          'szt'),
+  ('respirator',           'Respirator transportowy',      'medyczny',          'szt'),
+  ('ambulans_type_c',      'Ambulans typu C',              'pojazd_medyczny',   'szt'),
+  ('ambulans_type_b',      'Ambulans typu B',              'pojazd_medyczny',   'szt'),
+  ('namiot_polowy',        'Namiot polowy medyczny',       'logistyczny',       'szt'),
+  ('generator_wody',       'Generator wody pitnej',        'logistyczny',       'szt'),
+  ('samochod_osobowy',     'Samochód osobowy',             'pojazd_osobowy',    'szt'),
+  ('bus_9',                'Bus 9-osobowy',                'pojazd_osobowy',    'szt'),
+  ('minibus_15',           'Minibus 15-osobowy',           'pojazd_osobowy',    'szt'),
+  ('ambulans_lotniczy',    'Ambulans lotniczy (LPR)',       'pojazd_medyczny',   'szt'),
+  ('smigłowiec_ratowniczy','Śmigłowiec ratowniczy',        'lotniczy',          'szt'),
+  ('łódź_motorowa',        'Łódź motorowa ratownicza',     'sprzet_wodny',      'szt'),
+  ('quoad',                'Quad ratowniczy',              'pojazd_ratowniczy', 'szt'),
+  ('skuter_wodny',         'Skuter wodny',                 'sprzet_wodny',      'szt'),
+  ('namiot_logistyczny',   'Namiot logistyczny',           'logistyczny',       'szt'),
+  ('kuchnia_polowa',       'Kuchnia polowa',               'logistyczny',       'szt'),
+  ('agregat_oswietleniowy','Agregat oświetleniowy',        'energetyczny',      'szt'),
+  ('woz_dowodzenia',       'Wóz dowodzenia i łączności',  'pojazd_specjalny',  'szt'),
+  ('woz_chemiczny',        'Wóz chemiczny (Hazmat)',        'pojazd_specjalny',  'szt'),
+  ('dron_ratowniczy',      'Dron ratowniczy',              'lotniczy',          'szt'),
+  ('kamera_termiczna',     'Kamera termiczna',             'sprzet_elektroniczny', 'szt'),
+  ('radiotelefon',         'Radiotelefon przenośny',       'sprzet_elektroniczny', 'szt'),
+  ('dezynfektor',          'Urządzenie do dezynfekcji',    'medyczny',          'szt'),
+  ('tlen_medyczny',        'Butla z tlenem medycznym',     'medyczny',          'szt'),
+  ('ponton_gumowy',        'Ponton gumowy 4-osobowy',      'sprzet_wodny',      'szt'),
+  ('pila_do_betonu',       'Piła do betonu/asfaltu',       'sprzet_ratowniczy', 'szt'),
+  ('sprzet_wspinaczkowy',  'Sprzęt wspinaczkowy',          'sprzet_ratowniczy', 'szt'),
+  ('nosze_drabinkowe',     'Nosze drabinkowe',             'medyczny',          'szt'),
+  ('wentylator_oddymowy',  'Wentylator oddymowy',          'sprzet_gasniczy',   'szt'),
+  ('dzialko_wodne',        'Działko wodne',                'sprzet_gasniczy',   'szt'),
+  ('srodek_pianotwórczy',  'Środek pianotwórczy 200L',     'sprzet_gasniczy',   'beczka'),
+  ('maska_ochronna',       'Maska ochronna SCBA',          'sprzet_ochrony',    'szt'),
+  ('kombinezon_chem',      'Kombinezon chemoochronny',     'sprzet_ochrony',    'szt'),
+  ('apteczka_torba',       'Torba PSP R1',                 'medyczny',          'szt'),
+  ('koc_NRC',              'Koc termiczny NRC',            'medyczny',          'szt'),
+  ('kotwica_ratownicza',   'Kotwica ratownicza',           'sprzet_wodny',      'szt'),
+  ('plywak_ratowniczy',    'Pływak ratowniczy',            'sprzet_wodny',      'szt'),
+  ('statek_ratowniczy',    'Statek ratowniczy',            'sprzet_wodny',      'szt'),
+  ('sonda_ratownicza',     'Sonda ratownicza akustyczna',  'sprzet_ratowniczy', 'szt'),
+  ('pies_ratowniczy',      'Pies ratowniczy z przewodnikiem', 'zasoby_ludzkie', 'para'),
+  ('nurek_ratowniczy',     'Nurek ratowniczy',             'zasoby_ludzkie',    'os')
+ON CONFLICT (code) DO NOTHING;
+```
 
-**Opis:**
-`DecisionAgent` słucha `IkeRecalculatedEvent` (nie `ThreatUpdatedEvent`).
-Logika prógów: IKE ≥ 0.70 → `ewakuuj_natychmiast`, 0.40–0.69 → `przygotuj_ewakuacje`,
-< 0.40 → `monitoruj`, null → pomiń.
-Pole `uzasadnienie` — wygeneruj z dominujących score'ów (pobierz `score_*` z `ike_results`).
-Zapis do `evacuation_decisions` z `correlation_id` z eventu.
-`DecisionController`: `GET /api/decisions`, `PATCH /api/decisions/{id}`.
+**08_seed_entity_resources.sql:**
+```sql
+INSERT INTO entity_resources (entity_id, resource_type_code, quantity, is_available, source)
+SELECT e.id, rt.code, (floor(random() * 3) + 1)::int, true, 'mock'
+FROM entity_registry e
+CROSS JOIN resource_type rt
+WHERE e.id <= 20
+  AND rt.code IN ('woz_cysternowy', 'ponton_motorowy', 'agregat_pradotworczy', 'nosze_transportowe', 'ambulans_type_b')
+ON CONFLICT (entity_id, resource_type_code) DO NOTHING;
+```
 
 **Weryfikacja:**
 ```bash
-# Wywołaj pełny flow
-curl -s -X POST http://localhost:8080/api/ike/recalculate
-sleep 15
-
-# Sprawdź rekomendacje
-curl -s "http://localhost:8080/api/decisions" | jq '.liczba_decyzji'
-# oczekiwane: > 0
-
-curl -s "http://localhost:8080/api/decisions?rekomendacja=ewakuuj_natychmiast" \
-  | jq '.decyzje[0].uzasadnienie'
-# oczekiwane: niepusty string
-
-# Zatwierdź rekomendację
-DECISION_ID=$(curl -s "http://localhost:8080/api/decisions" | jq '.decyzje[0].id')
-curl -s -X PATCH http://localhost:8080/api/decisions/$DECISION_ID \
-  -H "Content-Type: application/json" \
-  -d '{"zatwierdzona": true}' | jq .zatwierdzona
-# oczekiwane: true
-
-# Sprawdź bazę
 docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT rekomendacja, COUNT(*) FROM evacuation_decisions GROUP BY rekomendacja;"
+  -c "SELECT COUNT(*) FROM resource_type;"
+# oczekiwane: 50
+docker compose exec postgres psql -U lublin -d gis_dashboard \
+  -c "SELECT COUNT(*) FROM entity_resources;"
+# oczekiwane: > 0
 ```
 
-**Commit:** `feat(2.3): DecisionAgent + EvacuationDecision + DecisionController`
+**Commit:** `feat(2.2): seed resource_type (50 typów) + mockowane entity_resources`
 
 ---
 
-### ⬜ 2.4 — FloodImportAgent (stub) + ThreatController
+### ⬜ 2.3 — ThreatAlertImportAgent + ThreatAlertEvent + endpoint manual
 
 **Pliki do stworzenia:**
-- `backend/.../agent/FloodImportAgent.java` (stub — tylko syntetyczne strefy, bez WFS)
+- `backend/.../event/ThreatAlertEvent.java`
+- `backend/.../event/NearbyUnitsComputedEvent.java`
+- `backend/.../config/AsyncConfig.java`
+- `backend/.../agent/ThreatAlertImportAgent.java`
 - `backend/.../controller/ThreatController.java`
 
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.2), `docs/API_REFERENCE.md` (`POST /api/threat/flood/import`, `POST /api/threat/clear`), `docs/DATA_SCHEMA.md` (tabela `strefy_zagrozen`)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.1–4.3), `docs/API_REFERENCE.md`
 
-**Opis:**
-W v1.1 `FloodImportAgent` generuje syntetyczne strefy (prostokąty wzdłuż bbox powiatu)
-— bez prawdziwego WFS (to przychodzi w zadaniu 3.1).
-`ThreatController` — `POST /api/threat/flood/import` (202 Accepted, async),
-`POST /api/threat/clear` (czyści `strefy_zagrozen`, publikuje `ThreatUpdatedEvent`
-z pustą listą stref).
-Oba endpointy zwracają `correlation_id`.
-Obsługa 409 `IMPORT_IN_PROGRESS`.
+**ThreatAlertEvent.java:**
+```java
+public class ThreatAlertEvent extends ApplicationEvent {
+    private final Long alertId;
+    private final String threatType;   // "flood" | "fire" | "blackout"
+    private final String level;        // "warning" | "alarm" | "emergency"
+    private final String sourceApi;    // "imgw_hydro" | "manual"
+    private final Double lat;
+    private final Double lon;
+    private final Double radiusKm;
+    private final String correlationId;
+    // konstruktor + gettery
+}
+```
+
+**ThreatAlertImportAgent:**
+```java
+@Service
+@Slf4j
+public class ThreatAlertImportAgent {
+    private static final String IMGW_HYDRO_URL = "https://danepubliczne.imgw.pl/api/data/hydro";
+    // Polling co N minut @Scheduled
+    // Na start: używaj hardkodowanej mapy 5 stacji z koordynatami
+    // Sprawdź stan_wody > 400 (przykładowy próg) → INSERT threat_alert → publishEvent
+}
+```
+
+**ThreatController endpointy:**
+- `GET /api/threats/active` → lista aktywnych alertów
+- `POST /api/threats/manual` → ręczny trigger
+- `POST /api/threats/{id}/deactivate` → deaktywacja
+
+**IMGW format odpowiedzi (jeden element):**
+```json
+{
+  "id_stacji": "150180180",
+  "stacja": "Lublin",
+  "rzeka": "Bystrzyca",
+  "stan_wody": "245",
+  "stan_wody_data_pomiaru": "2026-04-22 06:00"
+}
+```
+
+Uwaga: IMGW nie zwraca koordynat. Użyj mapy `Map<String, double[]> STATION_COORDS` z hardkodowanymi kilkoma stacjami.
 
 **Weryfikacja:**
 ```bash
-# Import syntetyczny
-curl -s -X POST http://localhost:8080/api/threat/flood/import \
+# Backend uruchomiony, sprawdź
+curl -s http://localhost:8080/api/threats/active | jq '.count'
+# oczekiwane: 0
+
+curl -s -X POST http://localhost:8080/api/threats/manual \
   -H "Content-Type: application/json" \
-  -d '{"obszar": "chelm", "scenariusz": "Q100"}' | jq .status
+  -d '{"threat_type":"flood","level":"warning","lat":51.2,"lon":22.5,"radius_km":25.0}' \
+  | jq '.status'
 # oczekiwane: "started"
-
-sleep 20
-
-# Sprawdź strefy w bazie
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT kod, poziom, scenariusz FROM strefy_zagrozen;"
-
-# IKE powinno być już przeliczone (przez event chain)
-curl -s "http://localhost:8080/api/ike?kategoria=czerwony" | jq '.liczba_wynikow'
-# oczekiwane: > 0
-
-# Clear
-curl -s -X POST http://localhost:8080/api/threat/clear | jq .status
-sleep 15
-curl -s "http://localhost:8080/api/ike?kategoria=czerwony" | jq '.liczba_wynikow'
-# oczekiwane: 0 (score_zagrozenia = 0 po ThreatClear)
 ```
 
-**Commit:** `feat(2.4): FloodImportAgent stub + ThreatController (import syntetyczny + clear)`
+**Commit:** `feat(2.3): ThreatAlertEvent + ThreatAlertImportAgent (IMGW polling) + ThreatController`
 
 ---
 
-### ⬜ 2.5 — WebSocket (LiveFeedService + konfiguracja)
+### ⬜ 2.4 — NearbyUnitsAgent + NearbyUnitsComputedEvent
 
-**Pliki do stworzenia:**
-- `backend/.../config/WebSocketConfig.java`
-- `backend/.../service/LiveFeedService.java`
+**Pliki:**
+- `backend/.../agent/NearbyUnitsAgent.java`
 
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.5, §8), `docs/API_REFERENCE.md` (sekcja WebSocket)
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.4)
 
-**Opis:**
-`WebSocketConfig` — STOMP over SockJS, endpoint `/ws`, broker `/topic`.
-`LiveFeedService`:
-- `@EventListener(ThreatUpdatedEvent)` → push do `/topic/layers/L-03` (sygnał `LAYER_UPDATED`)
-  i `/topic/system` (typ `THREAT_IMPORT_COMPLETED` lub `THREAT_CLEARED`)
-- `@EventListener(IkeRecalculatedEvent)` → push do `/topic/ike` (lista `IkeResultSummary`),
-  pobierz rekomendacje z bazy i push do `/topic/decisions`, push do `/topic/system`
+```java
+@Service
+@Slf4j
+public class NearbyUnitsAgent {
+    @Autowired private EntityRegistryEntryRepository entityRepository;
+    @Autowired private ApplicationEventPublisher publisher;
 
-Payloady dokładnie jak w `API_REFERENCE.md` sekcja WebSocket.
-
-**Weryfikacja:**
-```bash
-# Test WebSocket przez wscat (npm install -g wscat)
-wscat -c ws://localhost:8080/ws
-
-# W osobnym terminalu wywołaj import
-curl -s -X POST http://localhost:8080/api/threat/flood/import \
-  -H "Content-Type: application/json" \
-  -d '{"obszar": "chelm", "scenariusz": "Q100"}'
-
-# W konsoli wscat (po subskrypcji /topic/system) powinny pojawić się wiadomości:
-# THREAT_IMPORT_COMPLETED → IKE_RECALCULATED → DECISIONS_GENERATED
+    @EventListener
+    @Async("agentTaskExecutor")
+    public void onThreatAlert(ThreatAlertEvent event) {
+        log.info("[NearbyUnitsAgent] processing — alertId={}", event.getAlertId());
+        List<Long> entityIds = findNearbyEntityIds(event.getLat(), event.getLon(),
+                event.getRadiusKm() * 1000);
+        log.info("[NearbyUnitsAgent] found {} units", entityIds.size());
+        publisher.publishEvent(new NearbyUnitsComputedEvent(
+                this, event.getCorrelationId(), entityIds, String.valueOf(event.getAlertId())));
+    }
+}
 ```
 
-**Commit:** `feat(2.5): WebSocketConfig + LiveFeedService — STOMP push po eventach`
+Native query w EntityRegistryEntryRepository:
+```java
+@Query(value = """
+    SELECT e.id FROM entity_registry e
+    WHERE ST_DWithin(e.geom::geography,
+                     ST_MakePoint(:lon, :lat)::geography,
+                     :radiusMeters)
+    """, nativeQuery = true)
+List<Long> findEntityIdsWithinRadius(
+    @Param("lat") double lat,
+    @Param("lon") double lon,
+    @Param("radiusMeters") double radiusMeters
+);
+```
+
+**Commit:** `feat(2.4): NearbyUnitsAgent — ST_DWithin spatial query + NearbyUnitsComputedEvent`
 
 ---
 
-### ⬜ 2.6 — Frontend: WebSocket client + ScenarioPanel
+### ⬜ 2.5 — LiveFeedService + WebSocket push
 
-**Pliki do stworzenia:**
+**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.5)
+
+```java
+@Service
+@Slf4j
+public class LiveFeedService {
+    @Autowired private SimpMessagingTemplate messagingTemplate;
+
+    @EventListener
+    @Async("agentTaskExecutor")
+    public void onThreatAlert(ThreatAlertEvent event) {
+        log.info("[LiveFeedService] push threat-alerts — correlationId={}", event.getCorrelationId());
+        messagingTemplate.convertAndSend("/topic/threat-alerts",
+                Map.of("alertId", event.getAlertId(), "type", event.getThreatType(),
+                       "level", event.getLevel(), "lat", event.getLat(), "lon", event.getLon(),
+                       "radiusKm", event.getRadiusKm()));
+    }
+
+    @EventListener
+    @Async("agentTaskExecutor")
+    public void onNearbyUnitsComputed(NearbyUnitsComputedEvent event) {
+        log.info("[LiveFeedService] push nearby-units — count={}", event.getEntityIds().size());
+        messagingTemplate.convertAndSend("/topic/nearby-units",
+                Map.of("alertId", event.getAlertId(),
+                       "entityIds", event.getEntityIds(),
+                       "correlationId", event.getCorrelationId()));
+    }
+}
+```
+
+**Commit:** `feat(2.5): LiveFeedService — STOMP push po ThreatAlertEvent + NearbyUnitsComputedEvent`
+
+---
+
+### ⬜ 2.6 — Frontend: ThreatAlertLayer
+
+**Pliki:**
+- `frontend/src/components/map/layers/ThreatAlertLayer.tsx`
+- `frontend/src/hooks/useThreatAlerts.ts`
+
+`useThreatAlerts` — React Query `GET /api/threats/active`, staleTime 30_000.
+
+`ThreatAlertLayer` — CircleMarker dla każdego alertu, kolor wg level:
+- `warning`: `#F59E0B`
+- `alarm`: `#EF4444`
+- `emergency`: `#7C3AED`
+
+Radius markera ≈ `radius_km * 1.5` px. Dodaj do MapContainer.tsx.
+
+**Commit:** `feat(2.6): ThreatAlertLayer — wizualizacja alertów zagrożeń na mapie`
+
+---
+
+### ⬜ 2.7 — Frontend: zasoby w EntityPopup + useEntityResources
+
+**Pliki:**
+- `frontend/src/hooks/useEntityResources.ts` (nowy)
+- `frontend/src/components/map/EntityPopup.tsx` (modyfikacja)
+
+`useEntityResources(entityId)` — `GET /api/entity-resources?entityId={id}`, staleTime 60_000.
+
+W EntityPopup dodaj sekcję zasobów:
+```tsx
+const { data: resources } = useEntityResources(properties.id)
+// W JSX:
+{resources && resources.resources.length > 0 && (
+  <>
+    <hr style={dividerStyle} />
+    <div style={{ fontWeight: 600, marginBottom: 4 }}>Zasoby</div>
+    {resources.resources.map(r => (
+      <div key={r.resource_type_code} style={rowStyle}>
+        <span>{r.name}</span>
+        <strong>{r.quantity} {r.is_available ? '✓' : '(niedostępny)'}</strong>
+      </div>
+    ))}
+  </>
+)}
+```
+
+**Commit:** `feat(2.7): zasoby jednostek w EntityPopup + useEntityResources hook`
+
+---
+
+### ⬜ 2.8 — Frontend: NearbyUnitsPanel + WebSocket client
+
+**Pliki:**
 - `frontend/src/services/websocketService.ts`
 - `frontend/src/hooks/useWebSocket.ts`
-- `frontend/src/components/panels/ScenarioPanel.tsx`
+- `frontend/src/components/panels/NearbyUnitsPanel.tsx`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout — ScenarioPanel), `docs/API_REFERENCE.md` (sekcja WebSocket, `POST /api/threat/flood/import`)
+`websocketService.ts` — SockJS + @stomp/stompjs, reconnect 5s.
+`useWebSocket` — subskrypcja `/topic/nearby-units` → aktualizuje Zustand (`nearbyEntityIds`, `activeAlertId`).
+`NearbyUnitsPanel` — lista jednostek w zasięgu alertu, przycisk "Wyczyść alert".
 
-**Opis:**
-`websocketService.ts` — SockJS + `@stomp/stompjs`, reconnect 5s.
-`useWebSocket` — hook subskrybujący topiki `/topic/ike`, `/topic/decisions`,
-`/topic/layers/L-03`, `/topic/system`. Po `/topic/ike` aktualizuje Zustand store.
-Po `/topic/layers/L-03` wywołuje `queryClient.invalidateQueries(['layers', 'L-03'])`.
-`ScenarioPanel` — dropdown powiatu, dropdown scenariusza (Q10/Q100/Q500/pożar/blackout),
-przycisk "Aktywuj", przycisk "Wyczyść zagrożenie", spinner podczas importu,
-status z `/topic/system`.
-
-**Weryfikacja:**
-```
-Manualne — przeglądarka http://localhost:5173:
-☐ ScenarioPanel widoczny w panelu bocznym
-☐ Wybranie "Q100 / chelm" + "Aktywuj" → spinner na przycisku
-☐ Po ~20s markery DPS w rejonie Chełma zmieniają kolor na czerwony/żółty
-☐ Bez ręcznego odświeżenia strony
-☐ "Wyczyść zagrożenie" → markery wracają do zielonego
-☐ Header pokazuje komunikat statusu z /topic/system
-```
-
-**Commit:** `feat(2.6): websocketService + useWebSocket + ScenarioPanel`
+**Commit:** `feat(2.8): WebSocket client + NearbyUnitsPanel — live feed alertów`
 
 ---
 
-### ⬜ 2.7 — Frontend: DecisionPanel + Top10Panel
+### ⬜ 2.9 — Frontend: manual threat trigger UI
 
-**Pliki do stworzenia:**
-- `frontend/src/components/panels/DecisionPanel.tsx`
-- `frontend/src/components/panels/Top10Panel.tsx`
-- `frontend/src/components/panels/FilterPanel.tsx`
-- `frontend/src/components/map/layers/EvacuationRoute.tsx`
-- `frontend/src/services/routingService.ts`
-- `frontend/src/utils/colorScale.ts`
-- `frontend/src/components/shared/IKEScore.tsx`
+**Plik:** `frontend/src/components/panels/ThreatTriggerPanel.tsx`
 
-**Dokumenty referencyjne:** `CLAUDE.md` (Layout, kolory IKE), `docs/API_REFERENCE.md` (`GET /api/decisions`, `PATCH /api/decisions/{id}`)
+Formularz: typ zagrożenia (dropdown), poziom (dropdown), radius (slider 10–100 km), przycisk "Aktywuj alert".
+Wywołuje `POST /api/threats/manual`. Spinner podczas czekania.
 
-**Opis:**
-`Top10Panel` — lista 10 placówek z najwyższym IKE (z Zustand store, odświeżana przez WebSocket).
-`DecisionPanel` — lista rekomendacji, przyciski "Zatwierdź" / "Odrzuć" (`PATCH /api/decisions/{id}`).
-`EntityFilterPanel` — filtr IKE kategoria + powiat + typ jednostki, wpływa na `EntityLayer`.
-`EvacuationRoute` — rysuje `trasa_ewakuacji_geojson` jako LineString na mapie po kliknięciu.
-`routingService.ts` — zapytanie do OSRM `router.project-osrm.org`.
-`colorScale.ts` — funkcja `ikeToColor(score)` → hex.
-
-**Weryfikacja:**
-```
-Manualne po aktywacji scenariusza Q100/chelm:
-☐ Top10Panel pokazuje posortowaną listę z IKE i kolorami
-☐ DecisionPanel pokazuje rekomendacje z uzasadnieniem
-☐ Kliknięcie "Zatwierdź" → rekomendacja oznaczona jako zatwierdzona
-☐ FilterPanel "czerwony" → tylko czerwone markery widoczne
-☐ Kliknięcie "Pokaż trasę" w Popup → trasa narysowana na mapie
-```
-
-**Commit:** `feat(2.7): DecisionPanel + Top10Panel + FilterPanel + EvacuationRoute`
+**Commit:** `feat(2.9): ThreatTriggerPanel — ręczny trigger alertu zagrożenia`
 
 ---
 
-### ⬜ 2.8 — Pozostałe warstwy GIS (L-02, L-04–L-07)
+## ⬜ v1.2 — Importy z publicznych API
 
-**Pliki do stworzenia:**
-- `frontend/src/components/map/layers/HeatmapLayer.tsx`
-- `frontend/src/components/map/layers/DrogiLayer.tsx`
-- `frontend/src/components/map/layers/TransportLayer.tsx`
-- `frontend/src/components/map/layers/RelokacjaLayer.tsx`
-- `frontend/src/components/map/layers/BialePlamiLayer.tsx`
-- `backend/src/main/resources/db/seed_drogi.sql` (kilka przykładowych dróg)
-- `backend/src/main/resources/db/seed_biale_plamy.sql`
+**Cel:** Rzeczywiste dane jednostek PSP, PRM i podmiotów leczniczych z polskich rejestrów.
 
-**Dokumenty referencyjne:** `docs/DATA_SCHEMA.md` (tabele `drogi_ewakuacyjne`, `biale_plamy`), `docs/API_REFERENCE.md` (`GET /api/layers/{id}`)
-
-**Opis:**
-Każda warstwa jako osobny komponent React-Leaflet. Widoczność kontrolowana przez
-`LayerControlPanel` (Zustand `mapStore.activeLayers`).
-`HeatmapLayer` — heatmapa gęstości podopiecznych (leaflet.heat lub własna implementacja).
-`DrogiLayer` — linie z kolorem wg `droznosc` (zielony/żółty/czerwony).
-`TransportLayer` — markery pojazdów.
-`RelokacjaLayer` — markery miejsc relokacji z pojemnością.
-`BialePlamiLayer` — poligony obszarów bez transportu.
-
-**Weryfikacja:**
-```
-Manualne:
-☐ Każda z 5 warstw włącza się/wyłącza przez LayerControlPanel
-☐ DrogiLayer — kolory zależne od drożności
-☐ RelokacjaLayer — marker z pojemnością w tooltipie
-☐ HeatmapLayer — widoczna heatmapa przy włączonej warstwie L-02
-☐ GET /api/layers/L-04 → feature_count > 0 (seed dróg wykonany)
-```
-
-**Commit:** `feat(2.8): warstwy L-02, L-04–L-07 — HeatmapLayer, DrogiLayer, Transport, Relokacja, BialePlamy`
+**Deliverable:** mapa z > 300 stacjami PSP i > 200 ZRM, clustering działa przy zoom < 9.
 
 ---
 
-## Iteracja v1.2 — Import WFS i kalkulatory
+### ⬜ 3.1 — PSP bulk import (CSV dane.gov.pl + geokodowanie Nominatim)
 
-Cel: prawdziwy import stref powodziowych z WFS ISOK/RZGW z fallbackiem syntetycznym.
-Trzy kalkulatory zasobów. Scraper placówek z mpips.gov.pl.
+**Pliki:**
+- `backend/.../agent/PspImportAgent.java`
+- `backend/.../service/NominatimGeocoderService.java`
 
----
+**Źródło:** `https://dane.gov.pl/pl/dataset/1050`
+**Format:** CSV. Parsuj przez Apache Commons CSV lub ręcznie. Upsert do entity_registry.
+**Rate limiting Nominatim:** max 1 req/s — `Thread.sleep(1100)` między zapytaniami.
 
-### ⬜ 3.1 — WfsClientService + FloodImportAgent (pełny)
-
-**Pliki do modyfikacji/stworzenia:**
-- `backend/.../service/WfsClientService.java`
-- `backend/.../agent/FloodImportAgent.java` (zastępuje stub z 2.4)
-
-**Dokumenty referencyjne:** `docs/ARCHITEKTURA_PLAN.md` (§4.2 — WFS endpoint, fallback)
-
-**Opis:**
-`WfsClientService` — HTTP GET na WFS ISOK (GML), parsowanie GML → GeoJSON,
-transformacja EPSG:2180 → EPSG:4326 (GeoTools lub ręczna transformacja).
-Timeout 10s, obsługa błędów → fallback syntetyczny z WARN.
-`FloodImportAgent` pełny: spróbuj WFS → przy błędzie użyj syntetycznego.
-Odpowiedź 202 zawiera `"zrodlo_danych": "wfs"` lub `"syntetyczne"`,
-nagłówek `X-Fallback-Used: true` przy fallbacku.
-
-**Weryfikacja:**
-```bash
-# Test z fallbackiem (WFS może być niedostępny — to normalne)
-curl -s -X POST http://localhost:8080/api/threat/flood/import \
-  -H "Content-Type: application/json" \
-  -d '{"obszar": "wlodawski", "scenariusz": "Q100"}' \
-  -i | grep -E "X-Fallback|zrodlo_danych"
-# oczekiwane: zrodlo_danych = "wfs" lub "syntetyczne" — oba są OK
-
-# Sprawdź że strefy mają poprawne współrzędne (EPSG:4326, nie 2180)
-docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT ST_SRID(geom), ST_AsText(ST_Centroid(geom)) FROM strefy_zagrozen LIMIT 1;"
-# SRID: 4326, centroid w okolicach (22–24°E, 50–52°N)
-```
-
-**Commit:** `feat(3.1): WfsClientService + FloodImportAgent pełny (WFS + fallback syntetyczny)`
+**Commit:** `feat(3.1): PspImportAgent — import PSP z dane.gov.pl + Nominatim geokodowanie`
 
 ---
 
-### ⬜ 3.2 — Kalkulatory zasobów (backend)
+### ⬜ 3.2 — PRM/ZRM bulk import (XLSX rjwprm.ezdrowie.gov.pl)
 
-**Pliki do stworzenia:**
-- `backend/.../service/KalkulatorService.java`
-- `backend/.../controller/KalkulatorController.java`
+**Plik:** `backend/.../agent/PrmImportAgent.java`
 
-**Dokumenty referencyjne:** `docs/API_REFERENCE.md` (`POST /api/calculate/transport`, `relocation`, `threat`)
+**Źródło:** `https://rjwprm.ezdrowie.gov.pl/` — XLSX codziennie.
+Parsowanie przez Apache POI. Upsert z `category_code='prm_unit'`.
 
-**Opis:**
-Trzy metody w `KalkulatorService`, każda z zapytaniem PostGIS `ST_DWithin`:
-1. Transport — policz pojazdy w promieniu, szacuj kursy i czas ewakuacji
-2. Relokacja — znajdź miejsca z pojemnością w promieniu, oblicz % wypełnienia
-3. Zasięg zagrożenia — sprawdź czy placówka jest w strefie, oblicz czas do zagrożenia
-
-Wszystkie operacje geospatiale w PostGIS, nie w Javie.
-
-**Weryfikacja:**
-```bash
-curl -s -X POST http://localhost:8080/api/calculate/transport \
-  -H "Content-Type: application/json" \
-  -d '{"placowka_kod": "DPS-CHE-002", "promien_km": 30, "uwzgledniaj_tylko_przystosowane": true}' \
-  | jq '.szacunek.liczba_kursow_min'
-# oczekiwane: liczba całkowita > 0
-
-curl -s -X POST http://localhost:8080/api/calculate/relocation \
-  -H "Content-Type: application/json" \
-  -d '{"placowka_kod": "DPS-LBL-001", "promien_km": 50, "tylko_dla_niesamodzielnych": false}' \
-  | jq '.pokrycie'
-# oczekiwane: "wystarczajace" lub "ograniczone"
-```
-
-**Commit:** `feat(3.2): KalkulatorService + KalkulatorController — 3 kalkulatory zasobów`
+**Commit:** `feat(3.2): PrmImportAgent — import ZRM/SOR z RJWPRM XLSX + geokodowanie`
 
 ---
 
-### ⬜ 3.3 — Kalkulatory (frontend UI)
+### ⬜ 3.3 — RPWDL import (podmioty lecznicze)
 
-**Pliki do stworzenia:**
-- `frontend/src/components/calculators/TransportCalculator.tsx`
-- `frontend/src/components/calculators/RelocationCalculator.tsx`
-- `frontend/src/components/calculators/ThreatSpreadCalculator.tsx`
-- `frontend/src/components/calculators/CalculatorHub.tsx`
+**Plik:** `backend/.../agent/RpwdlImportAgent.java`
 
-**Dokumenty referencyjne:** `docs/PRD.md` (§5.2 F-10)
+**Źródło:** `https://ezdrowie.gov.pl/portal/home/rejestry-medyczne/dane-z-rejestrow-medycznych`
+Szpitale, SPZOZ, hospicja. Parsowanie XLSX przez Apache POI.
 
-**Opis:**
-`CalculatorHub` — drawer/modal z zakładkami 3 kalkulatorów, otwierany przyciskiem "Kalkulatory"
-w stopce mapy. Każdy kalkulator: formularz wejściowy, przycisk "Oblicz", wyniki.
-`TransportCalculator` — wybór placówki (dropdown z API), promień, wynik: lista pojazdów + szacunek.
-`RelocationCalculator` — wybór placówki, wynik: tabela miejsc relokacji z odległością i %.
-`ThreatSpreadCalculator` — wybór placówki + typ zagrożenia + prędkość.
-
-**Weryfikacja:**
-```
-Manualne:
-☐ Przycisk "Kalkulatory" w stopce otwiera CalculatorHub
-☐ TransportCalculator: wybór DPS-CHE-002, promień 30km → wyniki widoczne
-☐ RelocationCalculator: wybór DPS-LBL-001 → tabela miejsc
-☐ ThreatSpreadCalculator: zwraca status zagrożenia
-```
-
-**Commit:** `feat(3.3): CalculatorHub + 3 kalkulatory zasobów (frontend)`
+**Commit:** `feat(3.3): RpwdlImportAgent — import podmiotów leczniczych z RPWDL`
 
 ---
 
-### ⬜ 3.4 — Scraper placówek
+### ⬜ 3.4 — Clustering jednostek na mapie
 
-**Pliki do stworzenia:**
-- `backend/.../service/ScraperService.java`
-- `backend/.../service/JsoupScraperService.java`
-- `backend/.../controller/ScraperController.java`
+**Warunek wstępny:** 3.1 i 3.2 ukończone (> 500 punktów w entity_registry).
 
-**Dokumenty referencyjne:** `docs/API_REFERENCE.md` (`POST /api/scraper/run`, `GET /api/scraper/log`), `docs/PRD.md` (§5.2 F-11)
+**Pliki:**
+- `frontend/package.json` (dodaj `supercluster`)
+- `frontend/src/components/map/layers/EntityLayer.tsx`
+- `frontend/src/hooks/useEntityLayerData.ts`
 
-**Opis:**
-Scraper HTML z Jsoup, źródło: `mpips.gov.pl/rejestr-placowek` lub BIP powiatów.
-Zapis do `placowka` z `zrodlo = 'scraping'`. Log scrapingu (liczba rekordów, błędy).
-`ScraperController`: `POST /api/scraper/run` (202, async), `GET /api/scraper/log`.
-`SCRAPER_INTERVAL_S` z `application.yml` — opcjonalny `@Scheduled`.
+**Logika:**
+- zoom < 9: klastry (supercluster), marker = koło z liczbą
+- zoom ≥ 11: pojedyncze markery
+- kliknięcie klastra → fitBounds do bbox
 
-**Weryfikacja:**
-```bash
-curl -s -X POST http://localhost:8080/api/scraper/run | jq .status
-# oczekiwane: "started"
-sleep 180   # scraping zajmuje do 3 minut
-
-curl -s http://localhost:8080/api/scraper/log | jq '.status'
-# oczekiwane: "completed" lub "failed" (sieć może być niedostępna — OK)
-
-curl -s http://localhost:8080/api/scraper/log | jq '.wyniki'
-# oczekiwane: obiekt z polami pobrano_rekordow, zaktualizowano, bledow
-```
-
-**Commit:** `feat(3.4): ScraperService (Jsoup) + ScraperController`
+**Commit:** `feat(3.4): clustering jednostek — supercluster, zoom-based grouping`
 
 ---
 
-## Iteracja v1.3 — UX i głos
-
-Cel: asystent głosowy (Web Speech API + Whisper fallback), pełny Docker stack prod.
-
----
+## ⬜ v1.3 — UX i głos
 
 ### ⬜ 4.1 — Asystent głosowy
 
-**Pliki do stworzenia:**
-- `frontend/src/services/voiceService.ts`
-- `frontend/src/hooks/useVoiceCommands.ts`
-- `frontend/src/utils/commandParser.ts`
-- `frontend/src/components/voice/VoiceAssistant.tsx`
-- `frontend/src/components/voice/VoiceButton.tsx`
+Web Speech API + fallback Whisper API. Komendy: "pokaż powiaty", "filtruj PSP", "aktywuj alert".
 
-**Dokumenty referencyjne:** `docs/PRD.md` (§5.2 F-12 — tabela komend)
-
-**Opis:**
-`voiceService.ts` — Web Speech API (`SpeechRecognition`), język `pl-PL`.
-Fallback: Whisper API (`VITE_OPENAI_API_KEY`) gdy Web Speech API niedostępne.
-`commandParser.ts` — mapowanie fraz na akcje (7 komend z tabeli F-12 w PRD).
-`useVoiceCommands` — hook wywołujący akcje Zustand store lub API.
-`VoiceButton` — przycisk mikrofonu w headerze, aktywacja Spacja.
-
-**Weryfikacja:**
-```
-Manualne (Chrome, localhost lub HTTPS):
-☐ Kliknięcie VoiceButton → przeglądarka prosi o dostęp do mikrofonu
-☐ "Pokaż powiat lubelski" → zoom na powiat lubelski
-☐ "Włącz warstwę zagrożeń" → warstwa L-03 włącza się
-☐ "Które placówki są czerwone?" → filtr IKE = czerwony aktywny
-☐ "Aktywuj powódź Q100" → wywołuje POST /api/threat/flood/import
-☐ Fallback: gdy Web Speech API niedostępne → przycisk pozostaje aktywny (Whisper)
-```
-
-**Commit:** `feat(4.1): asystent głosowy — Web Speech API + Whisper fallback + 7 komend`
-
----
+**Commit:** `feat(4.1): asystent głosowy — Web Speech API`
 
 ### ⬜ 4.2 — Docker stack produkcyjny
 
-**Pliki do stworzenia:**
-- `backend/Dockerfile`
-- `frontend/Dockerfile`
-- `frontend/nginx.conf`
-- `backend/src/main/resources/application-prod.yml`
-- `docker-compose.full.yml` (finalizacja — wersja kompletna z healthcheckami)
+`docker-compose.full.yml` — cały stack w kontenerach. Nginx reverse proxy. Zmienne env dla prod.
 
-**Dokumenty referencyjne:** `docs/DEPLOYMENT.md` (sekcje 5, 8), `docs/ARCHITEKTURA_PLAN.md` (§2)
-
-**Opis:**
-`backend/Dockerfile` — multi-stage: `maven:3.9-eclipse-temurin-21` (build) → `eclipse-temurin:21-jre` (run).
-`frontend/Dockerfile` — `node:20-alpine` (build) → `nginx:alpine` (serve).
-`nginx.conf` — proxy `/api/` i `/ws` na backend, SPA routing.
-`application-prod.yml` — `DATABASE_URL` z env, connection pool 20, brak hot reload.
-`docker-compose.full.yml` — healthchecki, `depends_on`, sieć wewnętrzna.
-
-**Weryfikacja:**
-```bash
-docker compose -f docker-compose.full.yml up --build -d
-sleep 30
-
-# Sprawdź kontenery
-docker compose -f docker-compose.full.yml ps
-# Oczekiwane: postgres healthy, backend running, frontend running
-
-curl -s http://localhost:8080/api/layers | jq '. | length'
-# oczekiwane: 7
-
-curl -s http://localhost:3000
-# oczekiwane: HTML strony frontendowej
-
-# WebSocket przez Nginx proxy
-# (test manualny — otwórz http://localhost:3000, aktywuj scenariusz)
-```
-
-**Commit:** `feat(4.2): Dockerfile backend/frontend + nginx.conf + docker-compose.full.yml`
+**Commit:** `feat(4.2): docker-compose.full.yml — produkcyjny stack`
 
 ---
 
 ## Dług techniczny
 
-> Zapisuj tu problemy zauważone przy implementacji, które wykraczają poza zakres aktywnego zadania.
-
-| # | Opis | Dotyczy zadania | Priorytet |
+| # | Opis | Dotyczy | Priorytet |
 |---|---|---|---|
-| DT-01 | Brak testów integracyjnych dla `IkeAgent` — ryzyko regresji przy refaktorze | 2.2 | Wysoki |
-| DT-02 | `seed_transport.sql` — tylko 10 pojazdów, większość placówek dostaje `score_braku_transportu = 1.0` | 1.1 | Średni |
-| DT-03 | Brak `.claudeignore` / `.gitignore` dla plików GeoJSON > 1MB | — | Niski |
-
----
-
-## Ukończone zadania
-
-> Przenoś tutaj po commicie.
-
-*(brak — projekt nie rozpoczęty)*
+| DT-NOMINATIM-CACHE | Cachować wyniki Nominatim w Redis lub tabeli SQL — uniknąć limitu 1 req/s przy dużych importach | 3.1–3.3 | Wysoki |

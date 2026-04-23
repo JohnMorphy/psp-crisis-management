@@ -27,14 +27,12 @@
 | HTTP | `code` | Znaczenie |
 |---|---|---|
 | 400 | `INVALID_PARAMETER` | Nieprawidłowa wartość parametru |
-| 404 | `PLACOWKA_NOT_FOUND` | Placówka nie istnieje |
+| 404 | `ENTITY_NOT_FOUND` | Jednostka nie istnieje |
 | 404 | `LAYER_NOT_FOUND` | Warstwa nie istnieje |
-| 409 | `IMPORT_IN_PROGRESS` | Import WFS już trwa |
-| 409 | `RECALCULATE_IN_PROGRESS` | IKE już jest obliczane |
-| 422 | `IKE_NULL_RESULT` | IKE nie może być obliczone |
+| 409 | `IMPORT_IN_PROGRESS` | Import już trwa |
 | 500 | `INTERNAL_ERROR` | Nieoczekiwany błąd serwera |
 | 503 | `WFS_UNAVAILABLE` | WFS niedostępny — użyto fallbacku |
-| 503 | `OSRM_UNAVAILABLE` | OSRM niedostępny |
+| 503 | `IMGW_UNAVAILABLE` | API IMGW niedostępne — użyto cache |
 
 ---
 
@@ -42,105 +40,20 @@
 
 | Metoda | Ścieżka | Opis | Iteracja |
 |---|---|---|---|
-| `POST` | `/api/threat/flood/import` | Import danych WFS + publikacja ThreatUpdatedEvent | v1.1 |
-| `POST` | `/api/threat/clear` | Wyczyszczenie stref + publikacja ThreatUpdatedEvent | v1.1 |
 | `GET` | `/api/layers` | Lista konfiguracji warstw | v1.0 |
 | `GET` | `/api/layers/{id}` | Dane GeoJSON warstwy (L-01…L-10) | v1.0 |
 | `POST` | `/api/admin-boundaries/import` | Import granic z GUGiK PRG WFS | v1.0 |
-| `GET` | `/api/ike` | Wyniki IKE dla wszystkich placówek | v1.0 |
-| `GET` | `/api/ike/{kod}` | Wynik IKE dla jednej placówki | v1.0 |
-| `POST` | `/api/ike/recalculate` | Wymuszenie przeliczenia (admin) | v1.1 |
-| `GET` | `/api/ike/config` | Aktualna konfiguracja wag IKE | v1.0 |
-| `GET` | `/api/decisions` | Rekomendacje ewakuacyjne | v1.1 |
-| `PATCH` | `/api/decisions/{id}` | Zatwierdzenie / odrzucenie rekomendacji | v1.1 |
-| `POST` | `/api/calculate/transport` | Kalkulator transportu | v1.2 |
-| `POST` | `/api/calculate/relocation` | Kalkulator miejsc relokacji | v1.2 |
-| `POST` | `/api/calculate/threat` | Kalkulator zasięgu zagrożenia | v1.2 |
+| `GET` | `/api/entity-resources` | Zasoby konkretnej jednostki | v1.1 |
+| `GET` | `/api/resource-types` | Słownik typów zasobów | v1.1 |
+| `GET` | `/api/threats/active` | Lista aktywnych alertów zagrożeń | v1.1 |
+| `POST` | `/api/threats/manual` | Ręczne utworzenie alertu zagrożenia | v1.1 |
+| `GET` | `/api/nearby-units` | Jednostki w zasięgu alertu | v1.1 |
 | `POST` | `/api/scraper/run` | Uruchomienie scrapera | v1.2 |
 | `GET` | `/api/scraper/log` | Log ostatniego scrapingu | v1.2 |
 
 ---
 
 ## Endpointy — szczegóły
-
----
-
-### `POST /api/threat/flood/import`
-
-Uruchamia `FloodImportAgent`: pobiera dane z WFS ISOK lub generuje syntetyczne,
-zapisuje do bazy i publikuje `ThreatUpdatedEvent`.
-
-**Operacja asynchroniczna** — zwraca `202 Accepted` natychmiast.
-Aktualizacja mapy następuje przez WebSocket (`/topic/layers/L-03`, `/topic/ike`).
-
-**Body:**
-
-```json
-{
-  "obszar": "chelm",
-  "scenariusz": "Q100"
-}
-```
-
-| Pole | Typ | Wymagane | Opis |
-|---|---|---|---|
-| `obszar` | string | ✅ | Kod powiatu (np. `chelm`, `lubelski`) lub bbox `lon_min,lat_min,lon_max,lat_max` |
-| `scenariusz` | string | ✅ | `Q10` \| `Q100` \| `Q500` \| `pozar_maly` \| `pozar_sredni` \| `pozar_duzy` \| `blackout_powiat` |
-
-**Response 202 Accepted:**
-
-```json
-{
-  "status": "started",
-  "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "scenariusz": "Q100",
-  "obszar": "chelm",
-  "zrodlo_danych": "wfs",
-  "szacowany_czas_s": 20,
-  "websocket_topics": ["/topic/layers/L-03", "/topic/ike", "/topic/decisions"]
-}
-```
-
-> Gdy WFS niedostępny, `zrodlo_danych` zwróci `"syntetyczne"` i pojawi się
-> nagłówek odpowiedzi `X-Fallback-Used: true`.
-
-**Response 409 (import już trwa):**
-
-```json
-{
-  "error": "Import jest już w toku (correlation_id: ...)",
-  "code": "IMPORT_IN_PROGRESS",
-  "timestamp": "2026-04-14T09:00:00Z"
-}
-```
-
----
-
-### `POST /api/threat/clear`
-
-Usuwa wszystkie rekordy z tabeli `strefy_zagrozen` i publikuje `ThreatUpdatedEvent`
-z pustą listą stref. `IkeAgent` przelicza IKE od nowa — z `score_zagrozenia = 0.0`
-dla wszystkich placówek (brak stref = brak zagrożenia), ale pozostałe składowe
-(transport, drożność, odległość, niesamodzielni) są liczone normalnie.
-Wyniki IKE po ThreatClear będą niskie, lecz niekoniecznie zerowe.
-
-> **Uwaga:** ThreatClear **nie zeruje IKE** — uruchamia pełne przeliczenie
-> algorytmu w warunkach braku zagrożenia. Przykład: placówka z `niesamodzielni_procent = 0.20`
-> i odległością relokacji 12 km uzyska IKE ≈ 0.06, nie 0.0.
-
-**Body:** brak
-
-**Response 202 Accepted:**
-
-```json
-{
-  "status": "started",
-  "correlation_id": "a1b2c3d4-...",
-  "akcja": "clear",
-  "usunieto_stref": 3,
-  "websocket_topics": ["/topic/layers/L-03", "/topic/ike", "/topic/decisions"]
-}
-```
 
 ---
 
@@ -154,15 +67,15 @@ Lista konfiguracji wszystkich aktywnych warstw GIS.
 [
   {
     "id": "L-01",
-    "nazwa": "DPS i placówki opiekuńcze",
-    "komponent": "DPSLayer",
+    "nazwa": "Jednostki ochrony ludności",
+    "komponent": "EntityLayer",
     "typ_geometrii": "Point",
     "domyslnie_wlaczona": true,
     "endpoint": "/api/layers/L-01",
     "interval_odswiezania_s": 900,
     "kolor_domyslny": "#3B82F6",
     "ikona": "building",
-    "opis": "Lokalizacja placówek DPS i domów opieki",
+    "opis": "Lokalizacja jednostek ochrony ludności (PSP, OSP, GOPR itp.)",
     "ostatnia_aktualizacja": "2026-04-14T08:00:00Z",
     "status": "ok"
   }
@@ -239,46 +152,13 @@ Dane GeoJSON jednej warstwy. `{id}` = `L-01` … `L-10`.
       "type": "Feature",
       "geometry": { "type": "Point", "coordinates": [23.4720, 51.1433] },
       "properties": {
-        "kod": "DPS-CHE-001",
-        "nazwa": "Dom Pomocy Społecznej przy ul. Polnej w Chełmie",
-        "typ": "DPS_dorosli",
+        "kod": "JOL-CHE-001",
+        "nazwa": "Jednostka Ochrony Ludności w Chełmie",
+        "typ": "PSP",
         "powiat": "chelm",
-        "liczba_podopiecznych": 83,
-        "pojemnosc_ogolna": 90,
-        "niesamodzielni_procent": 0.71,
-        "generator_backup": true,
-        "ike_score": 0.8320,
-        "ike_kategoria": "czerwony"
-      }
-    }
-  ]
-}
-```
-
-**Response 200 — warstwa L-03 (strefy zagrożeń, fragment):**
-
-```json
-{
-  "type": "FeatureCollection",
-  "layer_id": "L-03",
-  "ostatnia_aktualizacja": "2026-04-14T09:05:00Z",
-  "feature_count": 2,
-  "features": [
-    {
-      "type": "Feature",
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[23.35, 51.18],[23.42, 51.18],[23.42, 51.25],[23.35, 51.25],[23.35, 51.18]]]
-      },
-      "properties": {
-        "id": "POWODZ-CHE-001",
-        "typ_zagrozenia": "powodz",
-        "poziom": "czerwony",
-        "scenariusz": "Q100",
-        "nazwa": "Strefa zalewowa rzeki Uherka — rejon Sawina",
-        "szybkosc_wznoszenia_m_h": 0.25,
-        "czas_do_zagrozenia_h": 3,
-        "zrodlo": "wfs"
+        "gmina": "Chelm",
+        "adres": "ul. Przykładowa 1, 22-100 Chełm",
+        "telefon": "82-123-45-67"
       }
     }
   ]
@@ -287,57 +167,63 @@ Dane GeoJSON jednej warstwy. `{id}` = `L-01` … `L-10`.
 
 ---
 
-### `GET /api/ike`
+### `GET /api/entity-resources?entityId={id}`
 
-Wyniki IKE posortowane malejąco po `ike_score`.
-
-**Query params (opcjonalne):**
-
-| Param | Typ | Opis |
-|---|---|---|
-| `limit` | integer | Ogranicz liczbę wyników (domyślnie: wszystkie) |
-| `kategoria` | string | `czerwony` \| `zolty` \| `zielony` |
-| `powiat` | string | Filtruj do powiatu |
+Zasoby konkretnej jednostki.
 
 **Response 200:**
 
 ```json
 {
-  "obliczone_o": "2026-04-14T09:00:00Z",
-  "correlation_id": "f47ac10b-...",
-  "liczba_wynikow": 2,
-  "wyniki": [
+  "entity_id": 42,
+  "resources": [
+    { "resource_type_code": "woz_cysternowy", "name": "Wóz cysternowy", "quantity": 2, "is_available": true },
+    { "resource_type_code": "ponton_motorowy", "name": "Ponton motorowy", "quantity": 1, "is_available": true }
+  ]
+}
+```
+
+---
+
+### `GET /api/resource-types`
+
+Lista wszystkich typów zasobów (słownik).
+
+**Response 200:**
+
+```json
+{
+  "count": 15,
+  "resource_types": [
+    { "code": "woz_cysternowy", "name": "Wóz cysternowy GBA", "category": "pojazd_gasniczy", "unit_of_measure": "szt" }
+  ]
+}
+```
+
+---
+
+### `GET /api/threats/active`
+
+Lista aktywnych alertów zagrożeń.
+
+**Response 200:**
+
+```json
+{
+  "count": 2,
+  "alerts": [
     {
-      "placowka_kod": "DPS-CHE-002",
-      "placowka_nazwa": "Dom Pomocy Społecznej w Sawinie",
-      "powiat": "chelm",
-      "lat": 51.2108,
-      "lon": 23.3984,
-      "liczba_podopiecznych": 55,
-      "niesamodzielni_liczba": 49,
-      "ike_score": 0.8900,
-      "ike_kategoria": "czerwony",
-      "skladowe": {
-        "score_zagrozenia": 1.00,
-        "score_niesamodzielnych": 0.89,
-        "score_braku_transportu": 1.00,
-        "score_braku_droznosci": 0.70,
-        "score_odleglosci_relokacji": 0.25
-      },
-      "cel_relokacji": {
-        "kod": "REL-CHE-001",
-        "nazwa": "Hala Sportowa MOSiR Chełm",
-        "odleglosc_km": 22.4,
-        "pojemnosc_dostepna": 180,
-        "przyjmuje_niesamodzielnych": true
-      },
-      "trasa_ewakuacji_geojson": {
-        "type": "LineString",
-        "coordinates": [[23.3984, 51.2108],[23.4350, 51.1800],[23.4720, 51.1433]]
-      },
-      "czas_przejazdu_min": 31,
-      "data_warnings": [],
-      "obliczone_o": "2026-04-14T09:00:00Z"
+      "id": 1,
+      "source_api": "imgw_hydro",
+      "threat_type": "flood",
+      "level": "alarm",
+      "value": 520.0,
+      "threshold": 480.0,
+      "unit": "cm",
+      "lat": 51.24,
+      "lon": 22.57,
+      "radius_km": 30.0,
+      "detected_at": "2026-04-22T10:00:00Z"
     }
   ]
 }
@@ -345,231 +231,44 @@ Wyniki IKE posortowane malejąco po `ike_score`.
 
 ---
 
-### `GET /api/ike/{kod}`
+### `POST /api/threats/manual`
 
-Wynik IKE dla jednej placówki. Identyczna struktura jak jeden obiekt z `GET /api/ike`.
+Operator ręcznie tworzy alert zagrożenia.
 
----
+**Request:**
 
-### `POST /api/ike/recalculate`
-
-Endpoint administratorski — publikuje `ThreatUpdatedEvent` z bieżącymi strefami.
-Normalnie IKE przelicza się automatycznie po imporcie zagrożeń.
-
-**Body:** brak
+```json
+{
+  "threat_type": "flood",
+  "level": "warning",
+  "lat": 51.2,
+  "lon": 22.5,
+  "radius_km": 25.0,
+  "description": "Ręczny alert"
+}
+```
 
 **Response 202:**
 
 ```json
-{
-  "status": "started",
-  "correlation_id": "b2c3d4e5-...",
-  "szacowany_czas_s": 15
-}
+{ "status": "started", "alert_id": 5, "correlation_id": "uuid" }
 ```
-
-**Response 409:** `RECALCULATE_IN_PROGRESS`
 
 ---
 
-### `GET /api/ike/config`
+### `GET /api/nearby-units?alertId={id}`
 
-Aktualna konfiguracja wag algorytmu IKE.
+Jednostki w zasięgu alertu (wynik NearbyUnitsAgent).
 
 **Response 200:**
 
 ```json
 {
-  "wagi": {
-    "zagrozenie": 0.35,
-    "niesamodzielni": 0.25,
-    "transport_brak": 0.20,
-    "droznosc_brak": 0.15,
-    "odleglosc_relokacji": 0.05
-  },
-  "progi": { "czerwony": 0.70, "zolty": 0.40 },
-  "promienie_km": { "transport_dostepny": 15, "miejsca_relokacji": 50 },
-  "ostatnia_zmiana": "2026-04-14T08:00:00Z"
+  "alert_id": 5,
+  "entity_ids": [12, 34, 67],
+  "count": 3
 }
 ```
-
----
-
-### `GET /api/decisions`
-
-Rekomendacje ewakuacyjne wygenerowane przez `DecisionAgent` po ostatnim evencie.
-
-**Query params (opcjonalne):**
-
-| Param | Typ | Opis |
-|---|---|---|
-| `correlation_id` | string | Filtruj do konkretnego eventu |
-| `rekomendacja` | string | `ewakuuj_natychmiast` \| `przygotuj_ewakuacje` \| `monitoruj` |
-| `zatwierdzona` | boolean | `true` \| `false` \| brak (wszystkie) |
-
-**Response 200:**
-
-```json
-{
-  "correlation_id": "f47ac10b-...",
-  "wygenerowano_o": "2026-04-14T09:01:30Z",
-  "liczba_decyzji": 3,
-  "decyzje": [
-    {
-      "id": 42,
-      "placowka_kod": "DPS-CHE-002",
-      "placowka_nazwa": "Dom Pomocy Społecznej w Sawinie",
-      "powiat": "chelm",
-      "ike_score": 0.8900,
-      "rekomendacja": "ewakuuj_natychmiast",
-      "cel_relokacji_kod": "REL-CHE-001",
-      "cel_relokacji_nazwa": "Hala Sportowa MOSiR Chełm",
-      "uzasadnienie": "Placówka w strefie czerwonej, brak transportu w promieniu 15 km, 89% niesamodzielnych",
-      "zatwierdzona": null,
-      "wygenerowano_o": "2026-04-14T09:01:30Z"
-    },
-    {
-      "id": 43,
-      "placowka_kod": "DPS-CHE-001",
-      "placowka_nazwa": "Dom Pomocy Społecznej przy ul. Polnej w Chełmie",
-      "ike_score": 0.7320,
-      "rekomendacja": "ewakuuj_natychmiast",
-      "uzasadnienie": "IKE 0.73 — strefa żółta, wysoki udział niesamodzielnych",
-      "zatwierdzona": true,
-      "wygenerowano_o": "2026-04-14T09:01:30Z"
-    }
-  ]
-}
-```
-
----
-
-### `PATCH /api/decisions/{id}`
-
-Zatwierdzenie lub odrzucenie rekomendacji przez operatora.
-
-**Body:**
-
-```json
-{ "zatwierdzona": true }
-```
-
-**Response 200:**
-
-```json
-{
-  "id": 42,
-  "placowka_kod": "DPS-CHE-002",
-  "rekomendacja": "ewakuuj_natychmiast",
-  "zatwierdzona": true,
-  "zaktualizowano_o": "2026-04-14T09:05:00Z"
-}
-```
-
----
-
-### `POST /api/calculate/transport`
-
-**Body:**
-
-```json
-{
-  "placowka_kod": "DPS-CHE-002",
-  "promien_km": 30,
-  "uwzgledniaj_tylko_przystosowane": true
-}
-```
-
-**Response 200:**
-
-```json
-{
-  "placowka_kod": "DPS-CHE-002",
-  "podopieczni_do_ewakuacji": 55,
-  "niesamodzielni_liczba": 49,
-  "pojazdy_dostepne": [
-    {
-      "id": "TRP-005",
-      "typ": "bus_sanitarny",
-      "oznaczenie": "Bus San. CHE-1",
-      "pojemnosc_osob": 8,
-      "przyjmuje_niesamodzielnych": true,
-      "odleglosc_km": 6.2
-    }
-  ],
-  "szacunek": {
-    "liczba_kursow_min": 7,
-    "czas_ewakuacji_min": 210,
-    "uwagi": "Niedobór pojazdów przystosowanych: 49 niesamodzielnych, dostępna pojemność: 8 miejsc/kurs"
-  }
-}
-```
-
----
-
-### `POST /api/calculate/relocation`
-
-**Body:**
-
-```json
-{
-  "placowka_kod": "DPS-CHE-002",
-  "promien_km": 50,
-  "tylko_dla_niesamodzielnych": false
-}
-```
-
-**Response 200:**
-
-```json
-{
-  "placowka_kod": "DPS-CHE-002",
-  "podopieczni_do_przyjecia": 55,
-  "miejsca_relokacji": [
-    {
-      "kod": "REL-CHE-001",
-      "nazwa": "Hala Sportowa MOSiR Chełm",
-      "odleglosc_km": 22.4,
-      "pojemnosc_dostepna": 180,
-      "przyjmuje_niesamodzielnych": true,
-      "procent_wypelnienia_po_przyjeciu": 31
-    }
-  ],
-  "lacznie_wolnych_miejsc": 180,
-  "pokrycie": "wystarczajace"
-}
-```
-
-`pokrycie`: `"wystarczajace"` | `"ograniczone"` | `"brak"`
-
----
-
-### `POST /api/calculate/threat`
-
-**Body:**
-
-```json
-{
-  "placowka_kod": "DPS-CHE-002",
-  "typ_zagrozenia": "powodz",
-  "szybkosc_wznoszenia_m_h": 0.25
-}
-```
-
-**Response 200:**
-
-```json
-{
-  "placowka_kod": "DPS-CHE-002",
-  "typ_zagrozenia": "powodz",
-  "status_zagrozenia": "w_strefie",
-  "czas_do_zagrozenia_h": null,
-  "komentarz": "Placówka już w strefie zagrożenia powodziowego",
-  "rekomendacja": "Natychmiastowa ewakuacja — IKE = 0.89"
-}
-```
-
-`status_zagrozenia`: `"w_strefie"` | `"poza_strefa"` | `"brak_danych_strefy"`
 
 ---
 
@@ -583,7 +282,7 @@ Zatwierdzenie lub odrzucenie rekomendacji przez operatora.
 {
   "status": "started",
   "job_id": "scrape-2026-04-14-090000",
-  "zrodla": ["mpips.gov.pl/rejestr-placowek"],
+  "zrodla": ["bip.komendy-psp.gov.pl", "imgw.pl/api"],
   "szacowany_czas_s": 120
 }
 ```
@@ -621,23 +320,22 @@ Zatwierdzenie lub odrzucenie rekomendacji przez operatora.
 
 ### Do czego służy WebSocket w tej aplikacji
 
-Aplikacja działa event-driven — gdy operator aktywuje scenariusz zagrożenia, backend
-uruchamia asynchroniczny łańcuch: import stref → obliczenie IKE → generowanie rekomendacji.
-Cały łańcuch trwa do 30 sekund. WebSocket (STOMP over SockJS) jest jedynym mechanizmem,
-który pozwala frontendowi dowiedzieć się, że obliczenia się zakończyły i odświeżyć mapę
+Aplikacja działa event-driven — gdy pojawi się nowy alert zagrożenia (z IMGW lub ręczny),
+backend uruchamia asynchroniczny łańcuch obliczania jednostek w zasięgu.
+WebSocket (STOMP over SockJS) jest jedynym mechanizmem, który pozwala frontendowi
+dowiedzieć się, że obliczenia się zakończyły i odświeżyć mapę
 **bez poolingu i bez ręcznego odświeżenia strony przez operatora**.
 
 Konkretne zastosowania w UI:
 
 | Co się zmienia | Topik | Komponent który reaguje |
 |---|---|---|
-| Nowe strefy zagrożeń pojawiają się na mapie | `/topic/layers/L-03` | `ZagrozeniaLayer.jsx` |
-| Markery DPS zmieniają kolor (IKE przeliczone) | `/topic/ike` | `DPSLayer.jsx`, `Top10Panel.jsx` |
-| Rekomendacje pojawiają się w panelu | `/topic/decisions` | `DecisionPanel.jsx` |
+| Nowe alerty zagrożeń pojawiają się na mapie | `/topic/threat-alerts` | `AlertLayer.jsx` |
+| Lista jednostek w zasięgu zaktualizowana | `/topic/nearby-units` | `EntityLayer.jsx`, `NearbyUnitsPanel.jsx` |
 | Pasek statusu w nagłówku informuje o postępie | `/topic/system` | `Header.jsx` |
 
 Frontend **nie używa WebSocket do wysyłania** — wyłącznie do odbierania. Wszystkie
-akcje operatora idą przez REST (`POST /api/threat/flood/import` itp.).
+akcje operatora idą przez REST (`POST /api/threats/manual` itp.).
 
 ---
 
@@ -659,131 +357,39 @@ const client = new Client({
 
 ### Topiki i payloady
 
-#### `/topic/layers/L-03` — aktualizacja stref zagrożeń
+#### `/topic/threat-alerts` — nowe alerty zagrożeń
 
-Publikowany przez `LiveFeedService` po `ThreatUpdatedEvent` (gdy nowe strefy są już w bazie).
+Publikowany przez `LiveFeedService` po `ThreatAlertEvent`.
 
-Frontend po otrzymaniu tego komunikatu wykonuje `invalidateQueries(['layers', 'L-03'])`
-(React Query), co powoduje ponowne pobranie pełnego GeoJSON przez REST `GET /api/layers/L-03`.
-WebSocket niesie sygnał, nie dane — dzięki temu payload jest lekki niezależnie od
-liczby stref.
+Frontend po otrzymaniu wykonuje `invalidateQueries(['threats', 'active'])` (React Query),
+co powoduje ponowne pobranie listy alertów przez REST `GET /api/threats/active`.
 
 ```json
 {
-  "typ": "LAYER_UPDATED",
-  "layer_id": "L-03",
+  "typ": "THREAT_ALERT_UPDATED",
   "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "timestamp": "2026-04-14T09:00:45Z",
-  "liczba_obiektow": 2,
-  "scenariusz": "Q100",
-  "obszar": "chelm"
+  "timestamp": "2026-04-22T10:00:00Z",
+  "alert_count": 2
 }
 ```
 
 ---
 
-#### `/topic/ike` — wyniki IKE zaktualizowane
+#### `/topic/nearby-units` — jednostki w zasięgu alertu
 
-Publikowany przez `LiveFeedService` po `IkeRecalculatedEvent`.
+Publikowany przez `LiveFeedService` po `NearbyUnitsComputedEvent`.
 
-Niesie pełną listę wyników dla wszystkich placówek — frontend aktualizuje Zustand store
-bezpośrednio z payloadu (bez dodatkowego REST call), bo dane są kompletne.
-
-```json
-{
-  "typ": "IKE_RECALCULATED",
-  "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "obliczone_o": "2026-04-14T09:00:58Z",
-  "statystyki": {
-    "przetworzone": 48,
-    "czerwonych": 3,
-    "zoltych": 7,
-    "zielonych": 36,
-    "nieznanych": 2
-  },
-  "wyniki": [
-    {
-      "placowka_kod": "DPS-CHE-002",
-      "lat": 51.2108,
-      "lon": 23.3984,
-      "ike_score": 0.8900,
-      "ike_kategoria": "czerwony",
-      "cel_relokacji_kod": "REL-CHE-001",
-      "cel_relokacji_nazwa": "Hala Sportowa MOSiR Chełm",
-      "czas_przejazdu_min": 31
-    },
-    {
-      "placowka_kod": "DPS-LBL-001",
-      "lat": 51.3012,
-      "lon": 22.5891,
-      "ike_score": 0.4800,
-      "ike_kategoria": "zolty",
-      "cel_relokacji_kod": "REL-LBL-001",
-      "cel_relokacji_nazwa": "Hala Widowiskowo-Sportowa w Lublinie",
-      "czas_przejazdu_min": 18
-    },
-    {
-      "placowka_kod": "DPS-VLO-002",
-      "lat": 51.0500,
-      "lon": 23.8200,
-      "ike_score": null,
-      "ike_kategoria": "nieznany",
-      "cel_relokacji_kod": null,
-      "cel_relokacji_nazwa": null,
-      "czas_przejazdu_min": null
-    }
-  ]
-}
-```
-
-> Lista zawiera **wszystkie 48 placówek** — frontend nadpisuje cały store jedną operacją.
-> Składowe `score_*` nie są przekazywane przez WebSocket — dostępne przez `GET /api/ike/{kod}`.
-
----
-
-#### `/topic/decisions` — nowe rekomendacje ewakuacyjne
-
-Publikowany przez `LiveFeedService` po zakończeniu pracy `DecisionAgent`
-(po odczekaniu na zapis do `evacuation_decisions` lub przez dodatkowy event
-`DecisionsGeneratedEvent` — do decyzji implementacyjnej).
-
-Niesie listę rekomendacji dla bieżącego `correlation_id`. Frontend podmienia
-zawartość `DecisionPanel` w całości.
+Niesie listę identyfikatorów jednostek w zasięgu alertu. Frontend aktualizuje
+Zustand store bezpośrednio z payloadu.
 
 ```json
 {
-  "typ": "DECISIONS_GENERATED",
+  "typ": "NEARBY_UNITS_COMPUTED",
+  "alert_id": 5,
   "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "wygenerowano_o": "2026-04-14T09:01:30Z",
-  "liczba_decyzji": 10,
-  "decyzje": [
-    {
-      "id": 42,
-      "placowka_kod": "DPS-CHE-002",
-      "placowka_nazwa": "Dom Pomocy Społecznej w Sawinie",
-      "powiat": "chelm",
-      "ike_score": 0.8900,
-      "ike_kategoria": "czerwony",
-      "rekomendacja": "ewakuuj_natychmiast",
-      "cel_relokacji_kod": "REL-CHE-001",
-      "cel_relokacji_nazwa": "Hala Sportowa MOSiR Chełm",
-      "uzasadnienie": "Strefa czerwona Q100, brak transportu w 15 km, 89% niesamodzielnych",
-      "zatwierdzona": null
-    },
-    {
-      "id": 43,
-      "placowka_kod": "DPS-LBL-001",
-      "placowka_nazwa": "Dom Pomocy Społecznej im. Jana Pawła II w Niemcach",
-      "powiat": "lubelski",
-      "ike_score": 0.4800,
-      "ike_kategoria": "zolty",
-      "rekomendacja": "przygotuj_ewakuacje",
-      "cel_relokacji_kod": "REL-LBL-001",
-      "cel_relokacji_nazwa": "Hala Widowiskowo-Sportowa w Lublinie",
-      "uzasadnienie": "Strefa żółta, 2 pojazdy dostępne, drogi przejezdne",
-      "zatwierdzona": null
-    }
-  ]
+  "entity_ids": [12, 34, 67],
+  "count": 3,
+  "computed_at": "2026-04-22T10:00:15Z"
 }
 ```
 
@@ -792,20 +398,17 @@ zawartość `DecisionPanel` w całości.
 #### `/topic/system` — zdarzenia systemowe i postęp operacji
 
 Używany przez `Header.jsx` do wyświetlania paska statusu podczas długich operacji
-(import WFS, przeliczanie IKE). Operator widzi co dzieje się "pod maską" bez
+(import granic, obliczanie jednostek w zasięgu). Operator widzi co dzieje się "pod maską" bez
 wchodzenia w logi.
 
 ```json
 {
-  "typ": "THREAT_IMPORT_COMPLETED",
-  "komunikat": "Import Q100 dla powiatu chełmskiego zakończony — 2 strefy załadowane",
+  "typ": "BOUNDARY_IMPORT_COMPLETED",
+  "komunikat": "Import granic administracyjnych zakończony",
   "correlation_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "timestamp": "2026-04-14T09:00:45Z",
+  "timestamp": "2026-04-22T10:00:45Z",
   "szczegoly": {
-    "zrodlo_danych": "wfs",
-    "liczba_stref": 2,
-    "scenariusz": "Q100",
-    "obszar": "chelm"
+    "poziomy": ["wojewodztwo", "powiat", "gmina"]
   }
 }
 ```
@@ -814,14 +417,11 @@ Pełna lista typów zdarzeń:
 
 | `typ` | Publikuje | Znaczenie dla UI |
 |---|---|---|
-| `THREAT_IMPORT_STARTED` | `FloodImportAgent` | Spinner na przycisku "Aktywuj scenariusz" |
-| `THREAT_IMPORT_COMPLETED` | `LiveFeedService` | Spinner znika, mapa odświeżona |
-| `THREAT_IMPORT_FALLBACK` | `LiveFeedService` | Toast: "Użyto danych syntetycznych (WFS niedostępny)" |
-| `THREAT_IMPORT_FAILED` | `LiveFeedService` | Toast błędu, import nieudany |
-| `THREAT_CLEARED` | `LiveFeedService` | Strefy znikają z mapy, IKE zerowane |
-| `IKE_RECALCULATION_STARTED` | `IkeAgent` | Spinner na panelu Top10 |
-| `IKE_RECALCULATED` | `LiveFeedService` | Markery DPS zmieniają kolor |
-| `DECISIONS_GENERATED` | `LiveFeedService` | DecisionPanel wypełnia się rekomendacjami |
+| `THREAT_ALERT_DETECTED` | `ThreatPollingAgent` | Nowy alert na mapie |
+| `NEARBY_UNITS_STARTED` | `NearbyUnitsAgent` | Spinner na panelu jednostek |
+| `NEARBY_UNITS_COMPUTED` | `LiveFeedService` | Lista jednostek zaktualizowana |
+| `BOUNDARY_IMPORT_STARTED` | `AdminBoundaryImportAgent` | Spinner importu granic |
+| `BOUNDARY_IMPORT_COMPLETED` | `LiveFeedService` | Granice załadowane |
 | `SCRAPER_COMPLETED` | `LiveFeedService` | Toast: "Pobrano N rekordów" |
 | `SYSTEM_WARNING` | dowolny agent | Toast ostrzeżenia (żółty) |
 
@@ -834,19 +434,15 @@ powinien traktować ją jako `Map<String, Object>` i wyświetlać tylko `komunik
 
 | Endpoint | Komponent / Hook |
 |---|---|
-| `POST /api/threat/flood/import` | `ScenarioPanel.jsx` |
-| `POST /api/threat/clear` | `ScenarioPanel.jsx` |
 | `GET /api/layers` | `useLayerData.js`, `LayerControlPanel.jsx` |
 | `GET /api/layers/{id}` | każdy `*Layer.jsx` |
-| `GET /api/ike` | `Top10Panel.jsx`, `DPSLayer.jsx` |
-| `GET /api/ike/{kod}` | `DPSPopup.jsx` |
-| `GET /api/decisions` | `DecisionPanel.jsx` |
-| `PATCH /api/decisions/{id}` | `DecisionPanel.jsx` (przycisk zatwierdź/odrzuć) |
-| `POST /api/calculate/transport` | `TransportCalculator.jsx` |
-| `POST /api/calculate/relocation` | `RelocationCalculator.jsx` |
-| `POST /api/calculate/threat` | `ThreatSpreadCalculator.jsx` |
+| `POST /api/admin-boundaries/import` | przycisk w `LayerControlPanel.jsx` |
+| `GET /api/entity-resources` | `EntityPopup.tsx` |
+| `GET /api/resource-types` | `ResourcePanel.jsx` |
+| `GET /api/threats/active` | `AlertLayer.jsx`, `AlertPanel.jsx` |
+| `POST /api/threats/manual` | `ManualAlertPanel.jsx` |
+| `GET /api/nearby-units` | `NearbyUnitsPanel.jsx`, `EntityLayer.jsx` |
 | `POST /api/scraper/run` | przycisk w `LayerControlPanel.jsx` |
-| WebSocket `/topic/layers/L-03` | `useWebSocket.js` → `invalidateQueries` → `ZagrozeniaLayer.jsx` |
-| WebSocket `/topic/ike` | `useWebSocket.js` → Zustand store → `DPSLayer.jsx`, `Top10Panel.jsx` |
-| WebSocket `/topic/decisions` | `useWebSocket.js` → Zustand store → `DecisionPanel.jsx` |
+| WebSocket `/topic/threat-alerts` | `useWebSocket.js` → `invalidateQueries` → `AlertLayer.jsx` |
+| WebSocket `/topic/nearby-units` | `useWebSocket.js` → Zustand store → `EntityLayer.jsx`, `NearbyUnitsPanel.jsx` |
 | WebSocket `/topic/system` | `useWebSocket.js` → `Header.jsx` (pasek statusu + toasty) |

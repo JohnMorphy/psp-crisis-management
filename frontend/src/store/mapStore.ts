@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 type ActiveLayers = Record<string, boolean>
 type EntityCategoryFilters = Record<string, boolean>
+type BoundaryLayerId = 'L-08' | 'L-09' | 'L-10'
 
 export type SelectedRegion = {
   name: string
@@ -19,6 +20,8 @@ type MapStore = {
   resetEntityCategoryFilters: () => void
   selectedRegion: SelectedRegion
   setSelectedRegion: (region: SelectedRegion) => void
+  selectedFeatureByLayer: Record<BoundaryLayerId, string | null>
+  setSelectedFeatureForLayer: (layerId: BoundaryLayerId, featureId: string | null) => void
   isPanelCollapsed: boolean
   togglePanel: () => void
 }
@@ -33,27 +36,15 @@ export const useMapStore = create<MapStore>()((set) => ({
     'L-10': false,
   },
   toggleLayer: (id, value) =>
-    set((state) => ({
-      activeLayers: {
-        ...state.activeLayers,
-        [id]: value,
-      },
-    })),
+    set((state) => ({ activeLayers: { ...state.activeLayers, [id]: value } })),
   entityCategoryFilters: {},
   setEntityCategoryFilter: (code, value) =>
-    set((state) => ({
-      entityCategoryFilters: {
-        ...state.entityCategoryFilters,
-        [code]: value,
-      },
-    })),
+    set((state) => ({ entityCategoryFilters: { ...state.entityCategoryFilters, [code]: value } })),
   hydrateEntityCategoryFilters: (codes) =>
     set((state) => {
       const next = { ...state.entityCategoryFilters }
       for (const code of codes) {
-        if (!(code in next)) {
-          next[code] = true
-        }
+        if (!(code in next)) next[code] = true
       }
       return { entityCategoryFilters: next }
     }),
@@ -65,7 +56,11 @@ export const useMapStore = create<MapStore>()((set) => ({
     })),
   selectedRegion: null,
   setSelectedRegion: (region) => set({ selectedRegion: region }),
+  selectedFeatureByLayer: { 'L-08': null, 'L-09': null, 'L-10': null },
+  setSelectedFeatureForLayer: (layerId, featureId) =>
+    set(() => ({
+      selectedFeatureByLayer: { 'L-08': null, 'L-09': null, 'L-10': null, [layerId]: featureId },
+    })),
   isPanelCollapsed: false,
-  togglePanel: () =>
-    set((state) => ({ isPanelCollapsed: !state.isPanelCollapsed })),
+  togglePanel: () => set((state) => ({ isPanelCollapsed: !state.isPanelCollapsed })),
 }))

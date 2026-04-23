@@ -2,7 +2,6 @@ import { MapContainer as LeafletMapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import AdminBoundaryLayer from './layers/AdminBoundaryLayer'
 import EntityLayer from './layers/EntityLayer'
-import ThreatZoneLayer from './layers/ThreatZoneLayer'
 
 const MAP_CENTER: [number, number] = [52.1, 19.4]
 const INITIAL_ZOOM = 6
@@ -24,7 +23,6 @@ function MapContainer() {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <AdminBoundaryLayer />
-      <ThreatZoneLayer />
       <EntityLayer />
     </LeafletMapContainer>
   )

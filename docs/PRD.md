@@ -1,56 +1,53 @@
-# PRD — Inteligentna Mapa Województwa Lubelskiego
-## Geospatial Decision Dashboard — Moduł Ewakuacji Osób Zależnych
+# PRD — Ogólnopolski Dashboard Jednostek Ochrony Ludności
+## Geospatial Dashboard — Przegląd Zasobów Kryzysowych
 
 | | |
 |---|---|
-| **Projekt** | Inteligentna Mapa Województwa Lubelskiego |
+| **Projekt** | Ogólnopolski Dashboard Jednostek Ochrony Ludności |
 | **Wersja** | 1.3 |
 | **Status** | Draft |
-| **Data** | 2026-04-14 |
-| **Kontekst** | Urząd Marszałkowski Województwa Lubelskiego |
+| **Data** | 2026-04-22 |
+| **Kontekst** | Operatorzy kryzysowi / koordynatorzy zasobów |
 
 ---
 
 ## 1. Cel produktu
 
-Interaktywny, webowy dashboard geospatialny dla Marszałka Województwa Lubelskiego
-umożliwiający podejmowanie decyzji opartych na danych w czasie rzeczywistym.
-
-Moduł główny: **zorganizowana, priorytetowa ewakuacja podopiecznych podmiotów/jednostek ochrony ludności** (DPS-y, placówki opiekuńcze, domy dziecka, hospicja) w warunkach powodzi, pożaru lub blackoutu energetycznego.
+Ogólnopolski, interaktywny dashboard geospatialny jednostek ochrony ludności
+umożliwiający operatorom kryzysowym przegląd dostępnych zasobów w czasie rzeczywistym.
 
 ### Problem
 
-Dane kluczowe dla decyzji kryzysowych są rozproszone w kilkudziesięciu systemach.
-W sytuacji kryzysowej operator musi ręcznie zbierać informacje z wielu źródeł,
-korelować je i dopiero wtedy podjąć decyzję. Ta fragmentacja kosztuje czas — a czas
-w kryzysie bezpośrednio zagraża życiu osób zależnych.
+Dane o jednostkach ochrony ludności (PSP, OSP, ZRM, Policja, WOT i inne) są
+rozproszone w kilkudziesięciu systemach i rejestrach. W sytuacji kryzysowej operator
+musi ręcznie zbierać informacje z wielu źródeł. Ta fragmentacja kosztuje czas.
 
 ### Mierzalne cele sukcesu
 
-| KPI | Cel | Gdzie weryfikować |
-|---|---|---|
-| Czas ładowania mapy | < 3 s przy łączu 10 Mbps | Lighthouse |
-| Czas odpowiedzi API (p95) | < 200 ms | Spring Boot Actuator |
-| Czas od wyboru scenariusza do aktualizacji mapy | < 30 s | Test e2e (import WFS + IKE + WebSocket) |
-| Pokrycie placówek w bazie | 100% DPS-ów i jednostek ochrony ludności województwa | `SELECT COUNT(*) FROM placowka` |
-| Zmiana warstwy / filtra w UI | < 500 ms | Test manualny |
+| KPI | Cel |
+|---|---|
+| Czas ładowania mapy | < 3 s przy łączu 10 Mbps |
+| Czas odpowiedzi API (p95) | < 200 ms |
+| Czas od alertu IMGW do aktualizacji mapy | < 30 s |
+| Pokrycie jednostek PSP w bazie | 100% po imporcie z dane.gov.pl |
+| Zmiana warstwy / filtra w UI | < 500 ms |
 
 ---
 
 ## 2. Użytkownicy i persony
 
-### 2.1 Persona główna — Marszałek / Operator Kryzysowy
+### 2.1 Persona główna — Operator Kryzysowy / Koordynator Zasobów
 
-- Osoba decyzyjna, nie-programista
-- Pracuje na dużym monitorze lub tablecie w sali konferencyjnej
-- Potrzebuje odpowiedzi: *„Które placówki ewakuować? Czym? Dokąd?"*
-- Oczekuje że wybranie scenariusza zagrożenia automatycznie uruchomi analizę
+- Operator kryzysowy / koordynator zasobów na poziomie województwa lub kraju
+- Pracuje na dużym monitorze lub tablecie podczas briefingu kryzysowego
+- Potrzebuje odpowiedzi: *„Jakie jednostki ochrony ludności i zasoby są dostępne w zagrożonym obszarze?"*
+- Oczekuje że alert zagrożenia automatycznie wskaże jednostki w zasięgu
 
 ### 2.2 Persona pomocnicza — Koordynator Logistyczny
 
 - Obsługuje system operacyjnie podczas kryzysu
-- Nakłada i filtruje warstwy, korzysta z kalkulatorów zasobów
-- Weryfikuje i zatwierdza wygenerowane rekomendacje ewakuacyjne
+- Nakłada i filtruje warstwy, przegląda zasoby jednostek w obszarze alertu
+- Weryfikuje listę jednostek w zasięgu i koordynuje działania
 
 ---
 
@@ -58,83 +55,60 @@ w kryzysie bezpośrednio zagraża życiu osób zależnych.
 
 ### 3.1 W zakresie (in-scope)
 
-- Interaktywna mapa GIS województwa lubelskiego (powiaty, gminy)
-- Wielowarstwowe nakładki danych
-- Dynamiczne odświeżanie danych (event-driven przez WebSocket)
-- Integracja danych geospatialnych z zewnętrznych źródeł (WFS / GeoJSON)
-- Automatyczne przeliczanie sytuacji kryzysowej (IKE) w reakcji na zmianę zagrożenia
-- Generowanie rekomendacji ewakuacyjnych przez DecisionAgent
-- Filtry geograficzne i tematyczne
+- Interaktywna mapa GIS całej Polski (województwa, powiaty, gminy)
+- Wielowarstwowe nakładki danych: jednostki ochrony ludności wg kategorii
+- Import jednostek z publicznych API i rejestrów (PSP, PRM, RPWDL)
+- Zasoby jednostek (mockowane + docelowo z rejestru) — filtrowanie po typie zasobu
+- Alerty zagrożeń z IMGW (poziomy wód) i ręczny trigger operatora
+- Przestrzenne wskazanie jednostek w zasięgu aktywnego alertu
+- Dynamiczne odświeżanie (WebSocket)
 - Responsywne UI na duży monitor / tablet
-- Wbudowane kalkulatory zasobów
-- Asystent głosowy (sterowanie mapą)
+- Asystent głosowy (v1.3)
 
 ### 3.2 Poza zakresem (out-of-scope)
 
-- Integracja z systemami operacyjnymi służb ratunkowych (SWD PSP)
+- Automatyczne rekomendacje ewakuacyjne (operator decyduje sam)
+- Sztuczny scoring ryzyka (IKE)
+- Integracja z systemami operacyjnymi służb (SWD PSP)
 - Moduł autentykacji i zarządzania użytkownikami
 - Obsługa danych niejawnych / wrażliwych (RODO)
 - Wersja mobilna (smartfon)
-- Integracja z social media
-
-> Baza danych PostgreSQL + PostGIS jest fundamentem systemu i jest **w zakresie**.
 
 ---
 
 ## 4. Model działania systemu (event-driven)
 
-System działa reaktywnie — zmiana stanu zagrożenia automatycznie uruchamia
-łańcuch analiz bez interwencji operatora.
+System działa reaktywnie — alert zagrożenia automatycznie wskazuje jednostki
+w zasięgu bez interwencji operatora.
 
-### 4.1 Centralny event: `ThreatUpdatedEvent`
+### 4.1 Centralny event: `ThreatAlertEvent`
 
 ```
-Użytkownik: wybiera scenariusz (np. powódź Q100 dla powiatu chełmskiego)
-    ↓
-FloodImportAgent:
-    1. pobiera dane z WFS (ISOK/RZGW) lub generuje syntetyczne (fallback)
-    2. konwertuje GML → GeoJSON, transformuje układ współrzędnych → EPSG:4326
-    3. zapisuje strefy do tabeli strefy_zagrozen
-    4. publishEvent(new ThreatUpdatedEvent(scenariusz, obszar, timestamp))
+ThreatAlertImportAgent (@Scheduled co N minut lub HTTP POST /api/threats/manual)
+    → poziom wody > próg alarmowy (IMGW API) lub ręczny trigger operatora
+    → INSERT do threat_alert (is_active=true)
+    → publishEvent(new ThreatAlertEvent(...))
     ↓ [HTTP odpowiada 202 Accepted — poniższe dzieje się asynchronicznie]
     ↓
-    ├── IkeAgent (@Async @EventListener ThreatUpdatedEvent)
-    │       przelicza IKE dla wszystkich placówek
-    │       zapisuje wyniki do ike_results
-    │       publishEvent(IkeRecalculatedEvent)   ← sekwencja gwarantowana
+    ├── NearbyUnitsAgent (@Async @EventListener ThreatAlertEvent)
+    │       PostGIS ST_DWithin: entity_registry w radius_km od geom alertu
+    │       publishEvent(NearbyUnitsComputedEvent)
     │            │
-    │            ├── DecisionAgent (@Async @EventListener IkeRecalculatedEvent)
-    │            │       generuje rekomendacje ewakuacyjne na podstawie gotowych wyników IKE
-    │            │       zapisuje do tabeli evacuation_decisions
-    │            │
-    │            └── LiveFeedService (@Async @EventListener IkeRecalculatedEvent)
-    │                    pushuje /topic/ike, /topic/decisions przez WebSocket
-    │                    frontend automatycznie odświeża mapę i panele
+    │            └── LiveFeedService (@Async @EventListener NearbyUnitsComputedEvent)
+    │                    pushuje /topic/nearby-units przez WebSocket
+    │                    frontend automatycznie odświeża panel jednostek
     │
-    └── LiveFeedService (@Async @EventListener ThreatUpdatedEvent)
-            pushuje /topic/layers/L-03 (nowe strefy) i /topic/system (postęp)
+    └── LiveFeedService (@Async @EventListener ThreatAlertEvent)
+            pushuje /topic/threat-alerts przez WebSocket
+
 ```
 
-### 4.2 Scenariusze zagrożeń
+### 4.2 Źródła alertów zagrożeń
 
-Użytkownik nie rysuje stref ręcznie. Wybiera gotowy scenariusz z listy:
-
-| Typ | Scenariusze | Źródło danych |
+| Źródło | Trigger | Dane |
 |---|---|---|
-| Powódź | Q10, Q100, Q500 | WFS ISOK / RZGW (fallback: syntetyczny) |
-| Pożar | Mały / Średni / Duży (promieniowo od punktu) | Syntetyczny (parametryczny) |
-| Blackout | Powiat / Strefa (obszar administracyjny) | Syntetyczny (obszar z bazy) |
-
-### 4.3 Kiedy IKE się przelicza
-
-IKE przelicza się **wyłącznie** w reakcji na `ThreatUpdatedEvent`. Nie ma przycisku
-„Przelicz IKE" dostępnego wprost — endpoint `POST /api/ike/recalculate` istnieje
-wyłącznie na potrzeby administratora i wewnętrznie publikuje `ThreatUpdatedEvent`.
-
-`DecisionAgent` i `LiveFeedService` (push IKE + rekomendacji) reagują na
-`IkeRecalculatedEvent` — event publikowany przez `IkeAgent` po zakończeniu
-obliczeń. Gwarantuje to, że rekomendacje nigdy nie są generowane na podstawie
-częściowych wyników IKE.
+| IMGW API | `@Scheduled` co N minut | Poziomy wód — stacje hydrologiczne |
+| Operator manualny | HTTP `POST /api/threats/manual` | Geolokalizacja + promień + typ |
 
 ---
 
@@ -144,23 +118,21 @@ częściowych wyników IKE.
 
 #### F-01 — Interaktywna mapa GIS
 
-- Mapa województwa lubelskiego z podziałem: powiaty i gminy (213 gmin + 4 miasta)
-- Płynny zoom od widoku województwa do miejscowości
+- Mapa całej Polski z podziałem administracyjnym: województwa, powiaty, gminy
+- Płynny zoom od widoku kraju do miejscowości
 - Podkład OpenStreetMap
 - Podświetlenie aktywnego powiatu / gminy po kliknięciu
-- Statystyki jednostki w panelu bocznym
+- Statystyki jednostek w panelu bocznym
 
 #### F-02 — Warstwy danych
 
 | ID | Nazwa | Typ | Źródło |
 |---|---|---|---|
-| L-01 | Jednostki ochrony ludności (DPS, placówki opiekuńcze, domy dziecka, hospicja) | Punkty | Tabela `placowka` |
-| L-02 | Gęstość podopiecznych | Heatmapa | Tabela `placowka` |
-| L-03 | Strefy zagrożenia | Poligony | Tabela `strefy_zagrozen` |
-| L-04 | Drożność dróg ewakuacyjnych | Linie | Tabela `drogi_ewakuacyjne` |
-| L-05 | Dostępność transportu | Punkty | Tabela `zasob_transportu` |
-| L-06 | Miejsca relokacji | Punkty | Tabela `miejsca_relokacji` |
-| L-07 | Białe plamy transportowe | Poligony | Tabela `biale_plamy` |
+| L-01 | Jednostki ochrony ludności (PSP, OSP, ZRM, Policja, WOT i inne) | Punkty | Tabela `entity_registry` |
+| L-02 | Gęstość jednostek | Heatmapa | Tabela `entity_registry` |
+| L-03 | Aktywne alerty zagrożeń | Poligony / punkty | Tabela `threat_alert` |
+| L-04 | Granice administracyjne | Poligony | Tabela `admin_boundary` |
+| L-05 | Zasięg alertu (jednostki w zasięgu) | Punkty | Wynik `NearbyUnitsAgent` |
 
 #### F-03 — Dynamiczne odświeżanie
 
@@ -170,33 +142,24 @@ częściowych wyników IKE.
 
 #### F-04 — Filtry i selekcja regionu
 
-- Filtrowanie widoku do powiatu / gminy
-- Filtr: typ placówki, poziom zagrożenia IKE (czerwony / żółty / zielony)
+- Filtrowanie widoku do województwa / powiatu / gminy
+- Filtr: kategoria jednostki, typ zasobu, status alertu (w zasięgu / poza zasięgiem)
 - Łączenie filtrów (AND), przycisk „Reset filtrów"
 
-#### F-05 — IKE (Indeks Krytyczności Ewakuacji)
+#### F-05 — Alerty zagrożeń (AlertsPanel)
 
-Szczegóły: `docs/IKE_ALGORITHM.md`.
+- Lista aktywnych alertów z IMGW (poziomy wód) i alertów manualnych operatora
+- Każdy alert: typ, lokalizacja, promień, czas aktywacji
+- Kolorowanie markerów jednostek: czerwony (w zasięgu alertu) / zielony (poza zasięgiem)
+- Przycisk „Wyzwól alert manualny" → `POST /api/threats/manual`
+- Przycisk „Dezaktywuj alert" → `POST /api/threats/{id}/deactivate`
 
-- Automatyczne przeliczanie po `ThreatUpdatedEvent`
-- Kolorowanie markerów: czerwony (≥0.70) / żółty (0.40–0.69) / zielony (<0.40)
-- Panel „Top 10 do ewakuacji"
-- Popup z danymi placówki + sugerowaną trasą + rekomendowanym miejscem relokacji
+#### F-06 — Panel jednostek w zasięgu (NearbyUnitsPanel)
 
-#### F-06 — Panel scenariuszy (ScenarioPanel)
-
-- Lista dostępnych scenariuszy (powódź Q10/Q100/Q500, pożar, blackout)
-- Wybór obszaru: dropdown powiatu lub bbox na mapie
-- Przycisk „Aktywuj scenariusz" → wywołuje `POST /api/threat/flood/import`
-- Przycisk „Wyczyść zagrożenie" → wywołuje `POST /api/threat/clear`
-- Status importu: spinner podczas pobierania WFS, komunikat błędu gdy WFS niedostępny
-
-#### F-07 — Panel rekomendacji (DecisionPanel)
-
-- Lista rekomendacji wygenerowanych przez DecisionAgent po ostatnim `IkeRecalculatedEvent`
-- Każda rekomendacja: placówka, akcja (ewakuuj / przygotuj / monitoruj),
-  priorytet, sugerowany cel relokacji
-- Możliwość zatwierdzenia / odrzucenia rekomendacji przez operatora
+- Lista jednostek ochrony ludności w zasięgu aktywnego alertu (wynik `NearbyUnitsAgent`)
+- Każda pozycja: nazwa, kategoria, odległość od alertu, dostępne zasoby
+- Sortowanie po odległości / kategorii
+- Kliknięcie → zoom na jednostkę na mapie
 
 #### F-08 — Responsywne UI
 
@@ -210,23 +173,24 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 
 #### F-10 — Kalkulatory zasobów
 
-**Kalkulator 1: Transport ewakuacyjny**
-- Wejście: placówka, promień szukania pojazdów
-- Wynik: czas ewakuacji, liczba kursów, lista pojazdów
+**Kalkulator 1: Zasięg alertu**
+- Wejście: punkt alertu, promień (km), typ zagrożenia
+- Wynik: liczba i lista jednostek w zasięgu według kategorii
 
-**Kalkulator 2: Pojemność miejsc relokacji**
-- Wejście: liczba ewakuowanych, poziom niesamodzielności
-- Wynik: lista miejsc z pojemnością i odległością, % wypełnienia
+**Kalkulator 2: Dostępność zasobów**
+- Wejście: typ zasobu (np. wóz cysternowy, ponton), obszar szukania
+- Wynik: liczba dostępnych zasobów danego typu w zasięgu, lista jednostek posiadających zasób
 
 **Kalkulator 3: Zasięg zagrożenia w czasie**
-- Wejście: typ zagrożenia, prędkość rozprzestrzeniania
-- Wynik: szacowany czas do objęcia placówki zagrożeniem
+- Wejście: typ zagrożenia, prędkość rozprzestrzeniania, punkt startowy
+- Wynik: szacowany czas do objęcia wskazanych jednostek zagrożeniem
 
-#### F-11 — Import i scraping danych podmiotów
+#### F-11 — Import i scraping danych jednostek
 
-- Pobieranie danych o placówkach z mpips.gov.pl, BIP powiatów i innych rejestrów urzędowych
+- Pobieranie danych o jednostkach PSP z dane.gov.pl i BIP PSP
+- Pobieranie danych PRM z rejestru RPWDL
 - Ujednolicony rejestr podmiotów: tabela `entity_registry` + `entity_category` (kategoryzacja typów jednostek)
-- Zapis do bazy z `zrodlo = 'scraping'` lub `zrodlo = 'wfs'`
+- Zapis do bazy z `zrodlo = 'scraping'` lub `zrodlo = 'api'`
 - Log importu z liczbą rekordów i błędami (tabela `entity_import_batch`)
 
 #### F-12 — Asystent głosowy
@@ -240,8 +204,8 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 | „Włącz warstwę zagrożeń" | Toggle L-03 |
 | „Wyłącz transport" | Toggle L-05 |
 | „Aktywuj powódź Q100" | Uruchomienie scenariusza powodziowego |
-| „Które placówki są czerwone?" | Filtr IKE = czerwony |
-| „Pokaż trasę ewakuacji dla placówki Końskowola" | Trasa na mapie |
+| „Które jednostki są w zasięgu alertu?" | Filtr status = w zasięgu |
+| „Pokaż jednostki PSP w Lublinie" | Filtr kategoria=PSP + zoom |
 | „Odśwież dane" | Manualne odświeżenie warstw |
 
 - Technologia: Web Speech API + fallback Whisper API (OpenAI)
@@ -254,7 +218,7 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 |---|---|---|
 | NF-01 | Ładowanie mapy | < 3 s przy 10 Mbps |
 | NF-02 | Responsywność UI | < 500 ms na zmianę warstwy / filtra |
-| NF-03 | Czas od ThreatUpdatedEvent do aktualizacji mapy | < 30 s (import + IKE + WebSocket) |
+| NF-03 | Czas od alertu IMGW do aktualizacji mapy | < 30 s (polling + NearbyUnitsAgent + WebSocket) |
 | NF-04 | Przeglądarki | Chrome 120+, Edge 120+, Firefox 120+ |
 | NF-05 | Czytelność | Kontrast WCAG AA |
 | NF-06 | Skalowalność | Nowa warstwa = INSERT do `layer_config`, zero zmian w kodzie |
@@ -268,19 +232,19 @@ Szczegóły: `docs/IKE_ALGORITHM.md`.
 
 | Dane | Źródło | Protokół | Fallback |
 |---|---|---|---|
-| Strefy zagrożenia powodziowego Q10/Q100/Q500 | ISOK / RZGW Hydroportal | WFS (GML) | Syntetyczny GeoJSON |
-| Granice administracyjne | GADM 4.1 / GUGiK | GeoJSON | Bounding box województwa |
-| Drogi ewakuacyjne | OpenStreetMap (Overpass API) | GeoJSON | Seed syntetyczny |
+| Poziomy wód — alerty | IMGW API | REST/JSON | Ręczny trigger operatora |
+| Jednostki PSP | dane.gov.pl / PSP API | REST/JSON | Seed syntetyczny |
+| Jednostki PRM | RPWDL | REST/JSON | Seed syntetyczny |
+| Granice administracyjne | GUGiK PRG | WFS (GML) | GADM 4.1 GeoJSON |
 
 ### 7.2 Dane seedowane do bazy
 
 | Dane | Plik seed | Rekordy |
 |---|---|---|
-| Placówki (DPS + jednostki ochrony ludności) | `02_seed_dps.sql` | 46+ (po 2 na powiat) |
+| Jednostki ochrony ludności (demo) | `02_seed_entity_registry.sql` | 50+ (mix kategorii) |
+| Typy zasobów | `02b_seed_resource_types.sql` | ~20 typów |
 | Konfiguracja warstw | `03_seed_layers.sql` | 7 (L-01…L-07) |
-| Miejsca relokacji | `04_seed_relokacja.sql` | ~10 |
-| Strefy zagrożeń (demo) | `05_seed_strefy.sql` | ~5 |
-| Zasoby transportowe | `06_seed_transport.sql` | ~10 |
+| Alerty zagrożeń (demo) | `05_seed_threat_alerts.sql` | ~5 |
 
 ---
 
@@ -293,9 +257,9 @@ Frontend (React)
     ↕ REST + WebSocket (STOMP)
 Backend (Spring Boot)
     ├── Controllers  — HTTP endpoints
-    ├── Agents       — IkeAgent, DecisionAgent, FloodImportAgent
-    ├── Events       — ThreatUpdatedEvent, IkeRecalculatedEvent
-    └── Services     — GeoService, KalkulatorService, ScraperService
+    ├── Agents       — ThreatAlertImportAgent, NearbyUnitsAgent
+    ├── Events       — ThreatAlertEvent, NearbyUnitsComputedEvent
+    └── Services     — GeoService, LiveFeedService, ImportService
     ↕
 PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 ```
@@ -306,28 +270,29 @@ PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 
 | ID | Jako… | Chcę… | Aby… |
 |---|---|---|---|
-| US-01 | Marszałek | wybrać scenariusz „powódź Q100" dla powiatu chełmskiego | system automatycznie pobrał dane i pokazał zagrożone placówki |
-| US-02 | Marszałek | zobaczyć aktualizację mapy bez odświeżania strony | wiedzieć na bieżąco jak zmienia się sytuacja |
-| US-03 | Operator | zobaczyć listę „Top 10 do ewakuacji" | natychmiast wiedzieć od czego zacząć |
-| US-04 | Operator | kliknąć na placówkę | uzyskać dane o podopiecznych, IKE i rekomendowanej trasie |
-| US-05 | Operator | zobaczyć panel rekomendacji | mieć gotowe decyzje do zatwierdzenia |
-| US-06 | Operator | uruchomić kalkulator transportu | oszacować potrzeby pojazdów |
-| US-07 | Marszałek | wydać komendę głosową | manewrować mapą bez odrywania rąk |
-| US-08 | Operator | wyczyścić aktualne zagrożenie | zresetować system po zakończeniu kryzysu |
+| US-01 | Operator kryzysowy | zobaczyć wszystkie jednostki ochrony ludności na mapie całej Polski | szybko ocenić dostępne zasoby w danym rejonie |
+| US-02 | Operator kryzysowy | zobaczyć aktualizację mapy bez odświeżania strony | wiedzieć na bieżąco jak zmienia się sytuacja |
+| US-03 | Operator kryzysowy | wyzwolić alert zagrożenia dla wybranego obszaru | system automatycznie wskazał jednostki w zasięgu alertu |
+| US-04 | Operator kryzysowy | kliknąć na jednostkę | uzyskać dane kontaktowe, zasoby i status alertu |
+| US-05 | Operator kryzysowy | filtrować jednostki po kategorii i typie zasobu | znaleźć jednostki o konkretnych możliwościach |
+| US-06 | Koordynator logistyczny | zobaczyć listę jednostek w zasięgu alertu z odległościami | skoordynować działania w obszarze zagrożenia |
+| US-07 | Operator kryzysowy | wydać komendę głosową | manewrować mapą bez odrywania rąk |
+| US-08 | Operator kryzysowy | dezaktywować alert | zresetować system po zakończeniu kryzysu |
 
 ---
 
 ## 10. Kryteria akceptacji (Definition of Done)
 
-- [ ] Wybór scenariusza zagrożenia uruchamia import danych i przeliczenie IKE
+- [ ] Mapa całej Polski z jednostkami ochrony ludności ładuje się w < 3 s
 - [ ] Frontend otrzymuje aktualizację przez WebSocket bez ręcznego odświeżania
-- [ ] IKE przelicza się automatycznie po `ThreatUpdatedEvent` — nie wymaga kliknięcia
-- [ ] DecisionAgent generuje rekomendacje widoczne w DecisionPanel
-- [ ] Panel „Top 10 do ewakuacji" wyświetla posortowaną listę z trasami
-- [ ] FloodImportAgent działa z WFS i z fallbackiem syntetycznym
-- [ ] `POST /api/threat/clear` czyści strefy i aktualizuje mapę
-- [ ] Kalkulatory transportu, relokacji i zasięgu zagrożenia działają
-- [ ] Scraper pobiera dane z ≥1 publicznego źródła
+- [ ] Alert zagrożenia (manualny lub z IMGW) automatycznie wskazuje jednostki w zasięgu
+- [ ] `NearbyUnitsAgent` przelicza jednostki w zasięgu po `ThreatAlertEvent` — wynik w < 30 s
+- [ ] Panel jednostek w zasięgu wyświetla posortowaną listę z odległościami
+- [ ] Import jednostek PSP z dane.gov.pl działa (100% pokrycia po imporcie)
+- [ ] `POST /api/threats/manual` tworzy alert i wywołuje `ThreatAlertEvent`
+- [ ] `POST /api/threats/{id}/deactivate` dezaktywuje alert i czyści warstwę
+- [ ] Filtry po kategorii jednostki i typie zasobu działają < 500 ms
+- [ ] Scraper / import pobiera dane z ≥1 publicznego źródła
 - [ ] Asystent głosowy rozpoznaje 7 komend z tabeli F-12
 - [ ] UI działa na 1920×1080 i 1280×800
 - [ ] Backend odpowiada < 200 ms (p95)
@@ -338,9 +303,9 @@ PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 
 | Iteracja | Zakres |
 |---|---|
-| **v1.0 — Fundament GIS** | Mapa, granice, jednostki ochrony ludności, entity registry, Spring Boot, PostGIS, seed placówek, REST `/api/layers`, `/api/ike` |
-| **v1.1 — Event-driven core** | `ThreatUpdatedEvent`, `IkeAgent`, `DecisionAgent`, `LiveFeedService`, WebSocket, `ScenarioPanel`, `DecisionPanel` |
-| **v1.2 — Import i kalkulatory** | `FloodImportAgent` (WFS + fallback), `POST /api/threat/flood/import`, `POST /api/threat/clear`, 3 kalkulatory, Scraper |
+| **v1.0 — Fundament GIS** | Mapa, granice, entity registry, Spring Boot, PostGIS, seed jednostek, REST `/api/layers`, `/api/entities` |
+| **v1.1 — Zasoby + Alerty** | `resource_type`, `entity_resources`, `threat_alert`, `ThreatAlertImportAgent` (IMGW), `NearbyUnitsAgent`, WebSocket, `AlertsPanel`, `NearbyUnitsPanel` |
+| **v1.2 — Importy API** | Import PSP z dane.gov.pl, PRM z RPWDL, Nominatim geokodowanie, clustering na mapie |
 | **v1.3 — UX i głos** | Asystent głosowy (Web Speech API + Whisper), pełny docker-compose, testy wydajnościowe |
 
 ---
@@ -349,8 +314,9 @@ PostgreSQL + PostGIS  (jedyne źródło danych runtime)
 
 | Ryzyko | Mitygacja |
 |---|---|
-| WFS ISOK niedostępny lub zmienia schemat | Syntetyczny fallback; cache ostatniego udanego importu w bazie |
+| IMGW API niedostępne lub zmienia schemat | Ręczny trigger operatora jako fallback; cache ostatniego stanu w bazie |
+| dane.gov.pl / RPWDL API niedostępne podczas importu | Retry z backoff; seed syntetyczny jako fallback startowy |
 | Asynchroniczne `@Async` listenery — trudniejsze debugowanie | Szczegółowe logowanie eventów; ID korelacji w każdym evencie |
-| PostGIS zapytania wolne przy 48 placówkach × 5 stref | Indeksy GiST; cache wyników IKE w `ike_results`; batch processing |
+| PostGIS zapytania wolne przy dużej liczbie jednostek | Indeksy GiST na kolumnach geometry; paginacja wyników API |
 | Web Speech API nie działa w Firefox / bez HTTPS | Fallback Whisper API; przyciski predefiniowanych komend w UI |
 | GeoJSON granic niedostępny | GADM 4.1 jako źródło z instrukcją pobierania w `docs/DATA_SCHEMA.md` |

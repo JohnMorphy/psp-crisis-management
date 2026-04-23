@@ -4,7 +4,8 @@
       "Bash(npm run:*)",
       "Bash(./mvnw compile:*)",
       "Bash(./mvnw test *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "WebSearch"
     ]
   }
 }

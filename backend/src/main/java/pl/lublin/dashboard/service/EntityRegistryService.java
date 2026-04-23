@@ -14,12 +14,10 @@ import pl.lublin.dashboard.model.EntityCategory;
 import pl.lublin.dashboard.model.EntityRegistryEntry;
 import pl.lublin.dashboard.model.EntitySource;
 import pl.lublin.dashboard.model.GranicaAdministracyjna;
-import pl.lublin.dashboard.model.IkeResult;
 import pl.lublin.dashboard.repository.EntityCategoryRepository;
 import pl.lublin.dashboard.repository.EntityRegistryEntryRepository;
 import pl.lublin.dashboard.repository.EntitySourceRepository;
 import pl.lublin.dashboard.repository.GranicaAdministracyjnaRepository;
-import pl.lublin.dashboard.repository.IkeResultRepository;
 
 import java.text.Normalizer;
 import java.time.OffsetDateTime;
@@ -44,7 +42,6 @@ public class EntityRegistryService {
     @Autowired private EntityRegistryEntryRepository entityRepository;
     @Autowired private EntityCategoryRepository categoryRepository;
     @Autowired private EntitySourceRepository sourceRepository;
-    @Autowired private IkeResultRepository ikeResultRepository;
     @Autowired private GranicaAdministracyjnaRepository granicaRepository;
     @Autowired private ObjectMapper objectMapper;
 
@@ -153,11 +150,8 @@ public class EntityRegistryService {
                 .filter(entry -> entry.getGeom() != null)
                 .toList();
 
-        Map<String, IkeResult> ikeMap = ikeResultRepository.findAll().stream()
-                .collect(Collectors.toMap(IkeResult::getPlacowkaKod, result -> result));
-
         List<Map<String, Object>> features = entries.stream()
-                .map(entry -> toFeature(entry, ikeMap.get(entry.getSourceRecordId())))
+                .map(this::toFeature)
                 .filter(feature -> feature != null)
                 .toList();
 
@@ -242,7 +236,7 @@ public class EntityRegistryService {
         return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
     }
 
-    private Map<String, Object> toFeature(EntityRegistryEntry entry, IkeResult ikeResult) {
+    private Map<String, Object> toFeature(EntityRegistryEntry entry) {
         Map<String, Object> geometry = geometryToMap(entry.getGeom());
         if (geometry == null) {
             return null;
@@ -251,15 +245,15 @@ public class EntityRegistryService {
         Map<String, Object> feature = new LinkedHashMap<>();
         feature.put("type", "Feature");
         feature.put("geometry", geometry);
-        feature.put("properties", buildProperties(entry, ikeResult));
+        feature.put("properties", buildProperties(entry));
         return feature;
     }
 
     private Map<String, Object> toResponseRow(EntityRegistryEntry entry) {
-        return buildProperties(entry, ikeResultRepository.findByPlacowkaKod(entry.getSourceRecordId()).orElse(null));
+        return buildProperties(entry);
     }
 
-    private Map<String, Object> buildProperties(EntityRegistryEntry entry, IkeResult ikeResult) {
+    private Map<String, Object> buildProperties(EntityRegistryEntry entry) {
         Map<String, Object> attributes = parseAttributes(entry.getAttributesJson());
         EntityCategory category = categoryRepository.findById(entry.getCategoryCode()).orElse(null);
         EntitySource source = sourceRepository.findById(entry.getSourceCode()).orElse(null);
@@ -293,8 +287,6 @@ public class EntityRegistryService {
         properties.put("source_priority", entry.getSourcePriority());
         properties.put("match_confidence", entry.getMatchConfidence());
         properties.put("attributes", attributes);
-        properties.put("ike_score", ikeResult != null ? ikeResult.getIkeScore() : null);
-        properties.put("ike_kategoria", ikeResult != null ? ikeResult.getIkeKategoria() : null);
         return properties;
     }
 

@@ -1,7 +1,7 @@
 import { CircleMarker, Popup } from 'react-leaflet'
 import EntityPopup from '../EntityPopup'
 import { useEntityLayerData } from '../../../hooks/useEntityLayerData'
-import type { EntityFeatureProperties, IkeCategory } from '../../../types/gis'
+import type { EntityFeatureProperties } from '../../../types/gis'
 import { useMapStore } from '../../../store/mapStore'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -11,12 +11,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   state_forest_unit: '#15803D',
   water_management_unit: '#0891B2',
   hospital_public: '#EA580C',
-}
-
-const IKE_COLORS: Record<IkeCategory, string> = {
-  czerwony: '#EF4444',
-  zolty: '#F59E0B',
-  zielony: '#22C55E',
 }
 
 const FALLBACK_COLOR = '#6B7280'
@@ -31,31 +25,34 @@ function EntityLayer() {
 
   if (!isVisible || !data?.features) return null
 
-  return data.features.map((feature) => {
-    const [lng, lat] = feature.geometry.coordinates as [number, number]
-    const props = feature.properties as EntityFeatureProperties
-    const baseColor = CATEGORY_COLORS[props.category_code] ?? FALLBACK_COLOR
-    const strokeColor = props.ike_kategoria ? (IKE_COLORS[props.ike_kategoria] ?? baseColor) : baseColor
+  return (
+    <>
+      {data.features.map((feature) => {
+        const [lng, lat] = feature.geometry.coordinates as [number, number]
+        const props = feature.properties as EntityFeatureProperties
+        const color = CATEGORY_COLORS[props.category_code] ?? FALLBACK_COLOR
 
-    return (
-      <CircleMarker
-        key={props.id}
-        center={[lat, lng]}
-        radius={8}
-        pane="markerPane"
-        pathOptions={{
-          color: strokeColor,
-          fillColor: baseColor,
-          fillOpacity: 0.85,
-          weight: 2,
-        }}
-      >
-        <Popup maxWidth={320} minWidth={250}>
-          <EntityPopup properties={props} />
-        </Popup>
-      </CircleMarker>
-    )
-  })
+        return (
+          <CircleMarker
+            key={props.id}
+            center={[lat, lng]}
+            radius={8}
+            pane="markerPane"
+            pathOptions={{
+              color,
+              fillColor: color,
+              fillOpacity: 0.85,
+              weight: 2,
+            }}
+          >
+            <Popup maxWidth={320} minWidth={250}>
+              <EntityPopup properties={props} />
+            </Popup>
+          </CircleMarker>
+        )
+      })}
+    </>
+  )
 }
 
 export default EntityLayer

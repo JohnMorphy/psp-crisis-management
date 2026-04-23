@@ -17,8 +17,6 @@ export interface GeoJsonCollection<P = Record<string, unknown>> {
   feature_count?: number
 }
 
-export type IkeCategory = 'czerwony' | 'zolty' | 'zielony'
-
 export interface EntityFeatureProperties {
   id: number
   source_record_id: string
@@ -46,8 +44,6 @@ export interface EntityFeatureProperties {
   source_priority: number | null
   match_confidence: number | null
   attributes: Record<string, unknown>
-  ike_score: number | null
-  ike_kategoria: IkeCategory | null
 }
 
 export interface EntityCategory {
@@ -73,15 +69,4 @@ export interface EntitySummary {
   needs_review_entities: number
   categories: EntitySummaryBucket[]
   sources: EntitySummaryBucket[]
-}
-
-export interface ThreatZoneProperties {
-  id: string
-  typ_zagrozenia: string
-  poziom: string
-  scenariusz: string | null
-  nazwa: string | null
-  szybkosc_wznoszenia_m_h: number | null
-  czas_do_zagrozenia_h: number | null
-  zrodlo: string | null
 }

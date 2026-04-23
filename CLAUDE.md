@@ -1,4 +1,4 @@
-# CLAUDE.md — Inteligentna Mapa Województwa Lubelskiego
+# CLAUDE.md — Ogólnopolski Dashboard Jednostek Ochrony Ludności
 
 > Ten plik jest automatycznie wczytywany przez Claude Code na początku każdej sesji.
 > Zawiera zasady projektu, mapę dokumentacji i aktualny status iteracji.
@@ -9,46 +9,45 @@
 
 ## Czym jest ten projekt
 
-Geospatial Decision Dashboard dla Marszałka Województwa Lubelskiego.
-Moduł główny: **Ewakuacja osób zależnych (podmioty/jednostki ochrony ludności: DPS, placówki opiekuńcze, domy dziecka, hospicja) w kryzysie** (powódź / pożar / blackout).
+Ogólnopolski Geospatial Dashboard Jednostek Ochrony Ludności.
 
-Użytkownik docelowy: osoba decyzyjna (nie-programista), pracująca na dużym monitorze
-lub tablecie podczas briefingu kryzysowego. System odpowiada na pytanie:
-„Które placówki ewakuować, czym i dokąd?" — w czasie < 15 minut od wykrycia kryzysu.
+Aplikacja mapuje i prezentuje jednostki ochrony ludności (PSP, OSP, ZRM/PRM, Policja,
+WOT, DPS i inne) importowane z rzeczywistych publicznych rejestrów i API.
+Służy operatorom kryzysowym do przeglądu dostępnych zasobów w danym obszarze.
+
+**Tryb sytuacyjny (baza):** przegląd jednostek na mapie, filtrowanie po typie i zasobach,
+szczegóły jednostki w popupie.
+
+**Tryb operacyjny (rozszerzenie v1.1+):** realny alert zagrożenia (np. IMGW: poziom wody
+> próg alarmowy) → automatyczne wskazanie jednostek w zasięgu alertu z ich zasobami.
+
+System odpowiada na pytanie:
+„Jakie jednostki ochrony ludności i zasoby są dostępne w zagrożonym obszarze?"
 
 ---
 
 ## Paradygmat: event-driven
 
-System działa reaktywnie na zdarzenia. Centralny event to **`ThreatUpdatedEvent`**.
+System działa reaktywnie na zdarzenia. Centralny event to **`ThreatAlertEvent`**.
 
 ```
-Użytkownik wybiera scenariusz zagrożenia (np. powódź Q100)
-    → FloodImportAgent pobiera dane z WFS (ISOK/RZGW) lub generuje syntetyczne
-    → zapisuje do tabeli strefy_zagrozen
-    → publisher.publishEvent(new ThreatUpdatedEvent(...))     [wątek HTTP kończy się tutaj — 202]
+ThreatAlertImportAgent (@Scheduled co N minut lub HTTP POST /api/threats/manual)
+    → poziom wody > próg alarmowy
+    → INSERT do threat_alert (is_active=true)
+    → publisher.publishEvent(new ThreatAlertEvent(...))     [wątek HTTP kończy się tutaj — 202]
 
-        [@Async] IkeAgent.onThreatUpdated()
-            → przelicza IKE dla wszystkich placówek
-            → zapisuje wyniki do ike_results
-            → publisher.publishEvent(new IkeRecalculatedEvent(...))
+        [@Async] NearbyUnitsAgent.onThreatAlert()
+            → PostGIS ST_DWithin: entity_registry w radius_km od geom alertu
+            → publisher.publishEvent(new NearbyUnitsComputedEvent(...))
 
-        [@Async] LiveFeedService.onThreatUpdated()
-            → pushuje /topic/layers/L-03 (nowe strefy) i /topic/system (status importu)
+        [@Async] LiveFeedService.onThreatAlert()
+            → push /topic/threat-alerts
 
-        [@Async] DecisionAgent.onIkeRecalculated()          ← słucha IkeRecalculatedEvent
-            → generuje rekomendacje ewakuacyjne na podstawie gotowych wyników IKE
-            → zapisuje do evacuation_decisions
-
-        [@Async] LiveFeedService.onIkeRecalculated()        ← słucha IkeRecalculatedEvent
-            → pushuje /topic/ike i /topic/decisions
-            → frontend odbiera event i odświeża mapę automatycznie
+        [@Async] LiveFeedService.onNearbyUnitsComputed()
+            → push /topic/nearby-units
 ```
 
-**Kluczowa zasada sekwencji:** `DecisionAgent` i push IKE/rekomendacji przez WebSocket
-reagują na `IkeRecalculatedEvent` — **nie** na `ThreatUpdatedEvent`. Gwarantuje to
-że rekomendacje są zawsze generowane na podstawie kompletnych wyników IKE,
-eliminując race condition.
+**Kluczowa zasada:** `NearbyUnitsAgent` i push przez WebSocket reagują na `ThreatAlertEvent` — operator widzi wynik w ciągu < 30 sekund od wykrycia alertu.
 
 ---
 
@@ -75,7 +74,6 @@ swojego kodu. Komunikują się wyłącznie przez REST API (JSON) i WebSocket (ST
 | `docs/ARCHITEKTURA_PLAN.md` | Stack, struktura katalogów, agenci, cele iteracji |
 | `docs/BACKLOG.md` | **Zadania agentowe** — jedyne źródło prawdy dla planu implementacji. Czytaj przed każdym zadaniem. |
 | `docs/DATA_SCHEMA.md` | Schematy SQL i seed files — czytaj przed tworzeniem danych |
-| `docs/IKE_ALGORITHM.md` | Formuła IKE, wagi, edge case'y, powiązanie z eventami |
 | `docs/API_REFERENCE.md` | Kontrakty REST i WebSocket z przykładami request/response |
 | `docs/DEPLOYMENT.md` | Uruchomienie dev/prod, zmienne środowiskowe, troubleshooting |
 
@@ -121,26 +119,24 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 ### Architektura
 - ✅ **Database-first:** jedyne źródło danych runtime to PostgreSQL.
-- ✅ **Event-driven:** zmiany stanu zagrożenia publikują `ThreatUpdatedEvent`.
-  Agenci (`IkeAgent`, `DecisionAgent`, `LiveFeedService`) reagują przez `@EventListener`.
+- ✅ **Event-driven:** zmiany stanu zagrożenia publikują `ThreatAlertEvent`.
+  Agenci (`NearbyUnitsAgent`, `LiveFeedService`) reagują przez `@EventListener`.
   Nigdy nie wywołuj agentów bezpośrednio z kontrolera.
-- ✅ **`@Async` na listenerach:** każdy `@EventListener` reagujący na `ThreatUpdatedEvent`
+- ✅ **`@Async` na listenerach:** każdy `@EventListener` reagujący na `ThreatAlertEvent`
   musi być oznaczony `@Async`. Request HTTP kończy się przed uruchomieniem listenerów.
 - ✅ Każda warstwa GIS = jeden rekord w tabeli `layer_config`. Dodanie warstwy = INSERT,
   zero zmian w kodzie.
-- ✅ Logika IKE wyłącznie w `IkeAgent`. Frontend konsumuje wynik przez REST lub WebSocket.
 - ✅ Operacje geoprzestrzenne przez **PostGIS** — nie w Javie ani JavaScript.
-- ❌ Nie wywołuj `IkeAgent` ani `DecisionAgent` bezpośrednio z kontrolerów.
-  Jedyna droga to `publisher.publishEvent(new ThreatUpdatedEvent(...))`.
+- ❌ Nie wywołuj `ThreatAlertImportAgent` ani `NearbyUnitsAgent` bezpośrednio z kontrolerów. Jedyna droga to `publisher.publishEvent(new ThreatAlertEvent(...))`.
 
 ### Agenci — odpowiedzialności
 
 | Agent / Serwis | Odpowiedzialność | Wyzwalacz |
 |---|---|---|
-| `FloodImportAgent` | Pobieranie danych WFS, konwersja GML→GeoJSON, zapis do `strefy_zagrozen`, publikacja `ThreatUpdatedEvent` | HTTP `POST /api/threat/flood/import` |
-| `IkeAgent` | Przeliczanie IKE dla wszystkich placówek, zapis do `ike_results`, publikacja `IkeRecalculatedEvent` | `@EventListener ThreatUpdatedEvent` |
-| `DecisionAgent` | Generowanie rekomendacji ewakuacyjnych na podstawie gotowych wyników IKE, zapis do `evacuation_decisions` | `@EventListener IkeRecalculatedEvent` |
-| `LiveFeedService` | Push stref i statusu po imporcie; push IKE i rekomendacji po przeliczeniu | `@EventListener ThreatUpdatedEvent` (strefy) + `@EventListener IkeRecalculatedEvent` (IKE/decyzje) |
+| `AdminBoundaryImportAgent` | Import granic adm. z GUGiK PRG WFS | HTTP `POST /api/admin-boundaries/import` |
+| `ThreatAlertImportAgent` | Polling IMGW API + manual trigger → zapis do `threat_alert` → `ThreatAlertEvent` | `@Scheduled` co N minut + HTTP `POST /api/threats/manual` |
+| `NearbyUnitsAgent` | PostGIS ST_DWithin: jednostki w zasięgu alertu → `NearbyUnitsComputedEvent` | `@EventListener ThreatAlertEvent` |
+| `LiveFeedService` | Push alertów i pobliskich jednostek przez WebSocket | `@EventListener ThreatAlertEvent` + `@EventListener NearbyUnitsComputedEvent` |
 
 ### Dane
 - ✅ Pliki seed (`seed_*.sql`) służą wyłącznie do inicjalizacji bazy. Nie są odczytywane
@@ -159,8 +155,8 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 ### UI
 - ✅ Mapa: minimum 70% szerokości. Panel boczny zwijany.
 - ✅ Font minimum 14px. Ciemny motyw (`bg-gray-900` / `bg-gray-800`).
-- ✅ Kolory IKE: czerwony `#EF4444` (≥0.70), żółty `#F59E0B` (0.40–0.69),
-  zielony `#22C55E` (<0.40).
+- ✅ Kolory alertów: czerwony `#EF4444` (alert aktywny/krytyczny), żółty `#F59E0B` (ostrzeżenie),
+  zielony `#22C55E` (brak alertu).
 - ❌ Popup placówki = Leaflet Popup (`EntityPopup.tsx`), nie modal.
 
 ---
@@ -169,7 +165,7 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  HEADER: [Logo] Inteligentna Mapa Woj. Lubelskiego  [Status][🎤]│
+│  HEADER: [Logo] Dashboard Jednostek Ochrony Ludności  [Status][🎤]│
 ├──────────────────────────────────────────┬──────────────────────┤
 │                                          │  PANEL BOCZNY (30%)  │
 │                                          │  ┌────────────────┐  │
@@ -181,32 +177,35 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 │                                          │  │ (toggle+czas)  │  │
 │   [Kliknięcie placówki → Popup Leaflet]   │  └────────────────┘  │
 │                                          │  ┌────────────────┐  │
-│                                          │  │ Top10Panel     │  │
-│                                          │  │ (lista IKE)    │  │
+│                                          │  │ AlertsPanel    │  │
+│                                          │  │ (lista alertów)│  │
 │                                          │  └────────────────┘  │
 │                                          │  ┌────────────────┐  │
-│                                          │  │ DecisionPanel  │  │
-│                                          │  │ (rekomendacje) │  │
+│                                          │  │ NearbyUnits    │  │
+│                                          │  │ (jdn. w zasięgu│  │
 │                                          │  └────────────────┘  │
 ├──────────────────────────────────────────┴──────────────────────┤
 │  [◀ Zwiń panel]  [🗺 Reset widoku]  [⊕ Kalkulatory]             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Popup placówki (`EntityPopup.tsx`):**
+**Popup jednostki (`EntityPopup.tsx`):**
 ```
 ┌─────────────────────────────────┐
-│ 🔴 [Typ] "Nazwa placówki" [✕]  │
-│ Powiat: lubelski · Gmina: ...   │
+│ 🔵 [Typ] "Nazwa jednostki" [✕]  │
+│ Kategoria · Źródło danych       │
 │ ─────────────────────────────── │
-│ Podopieczni: 45 (32 niesamodz.) │
-│ Pojemność: 60 · Obsada: 12 os.  │
-│ Generator: ✅  Kontakt: 81-xxx  │
+│ Adres: ul. Przykładowa 1        │
+│ Telefon: 81-xxx  Email: ...     │
+│ Status: aktywna                 │
 │ ─────────────────────────────── │
-│ IKE: 0.82 🔴 EWAKUACJA NATYCH. │
+│ Zasoby (mock):                  │
+│  Wóz cysternowy: 2 ✓            │
+│  Ponton motorowy: 1 ✓           │
 │ ─────────────────────────────── │
-│ [📍 Pokaż trasę ewakuacji]      │
-│ [🏠 Najbliższe miejsce relokacji]│
+│ Alert: 🔴 W ZASIĘGU ZAGROŻENIA  │
+│ ─────────────────────────────── │
+│ [🔗 Rekord źródłowy]            │
 └─────────────────────────────────┘
 ```
 
@@ -216,10 +215,12 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 
 | Iteracja | Status | Deliverable |
 |---|---|---|
-| v1.0 — Fundament GIS | ✅ Ukończona (1.1–1.12 ✅) | Mapa + granice (PL) + jednostki ochrony ludności + entity registry + Spring Boot + PostGIS |
-| v1.1 — Event-driven core | ⬜ Nie rozpoczęta | ThreatUpdatedEvent + IkeAgent + DecisionAgent + WebSocket |
-| v1.2 — Import i kalkulatory | ⬜ Nie rozpoczęta | FloodImportAgent (WFS) + 3 kalkulatory + Scraper |
-| v1.3 — UX i głos | ⬜ Nie rozpoczęta | ScenarioPanel + asystent głosowy + Docker prod |
+| v1.0 — Fundament GIS | ✅ Ukończona (1.1–1.12 ✅) | Mapa + granice (PL) + entity registry + Spring Boot + PostGIS |
+| REVISION 2 | ⬜ | Legacy removal (IKE, DPS tables, test-only layers) + docs update |
+| REVISION 1 | ⬜ | UX fixes: layer selection per warstwa, viewport |
+| DT-LOGS-TESTS | ⬜ | Logi + testy dla istniejących serwisów |
+| v1.1 — Zasoby + Alerty | ⬜ | resource_type, entity_resources, threat_alert, ThreatAlertImportAgent (IMGW), NearbyUnitsAgent, WebSocket |
+| v1.2 — Importy API | ⬜ | PSP, PRM, RPWDL bulk import + Nominatim geokodowanie + clustering |
 
 > ⬜ Nie rozpoczęta → 🔄 W toku → ✅ Ukończona
 
@@ -252,17 +253,32 @@ Szczegóły: `docs/DEPLOYMENT.md`.
 
 | Szukam... | Ścieżka |
 |---|---|
-| Definicja eventu | `backend/.../event/ThreatUpdatedEvent.java` |
-| Logika IKE | `backend/.../agent/IkeAgent.java` + `docs/IKE_ALGORITHM.md` |
-| Import WFS | `backend/.../agent/FloodImportAgent.java` |
-| Rekomendacje | `backend/.../agent/DecisionAgent.java` |
+| Definicje eventów | `backend/.../event/ThreatAlertEvent.java` + `NearbyUnitsComputedEvent.java` |
+| Alert zagrożenia | `backend/.../agent/ThreatAlertImportAgent.java` + tabela `threat_alert` |
+| Pobliskie jednostki | `backend/.../agent/NearbyUnitsAgent.java` |
+| Zasoby jednostek | tabela `entity_resources` + `resource_type` |
 | Kontrakty API | `docs/API_REFERENCE.md` |
 | Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
 | Konfiguracja warstw | tabela `layer_config` — seed: `db/03_seed_layers.sql` |
-| Wagi IKE | `backend/src/main/resources/ike.config.json` (frontend pobiera przez `GET /api/ike/config`) |
 | Rejestr podmiotów | `backend/.../model/EntityRegistryEntry.java` + tabela `entity_registry` |
 | Warstwa placówek (frontend) | `frontend/src/components/map/layers/EntityLayer.tsx` |
 | Popup placówki (frontend) | `frontend/src/components/map/EntityPopup.tsx` |
+
+---
+
+## Logi i testy — obowiązek na każdym zadaniu
+
+Każdy nowy lub modyfikowany serwis/agent backendu MUSI zawierać:
+
+1. `@Slf4j` lub `private static final Logger log = LoggerFactory.getLogger(X.class);`
+2. `log.info("[NazwaKlasy] opis — correlationId={}", id)` na wejściu kluczowych metod
+3. `log.error("[NazwaKlasy] błąd — correlationId={}, msg={}", id, e.getMessage())` w catch
+4. Testy jednostkowe w `src/test/java/` z `@ExtendWith(MockitoExtension.class)`
+   — pokrycie każdej metody z logiką biznesową (nie getterów, nie repozytoriów)
+
+Frontend: vitest dla funkcji w `utils/` i `hooks/` z logiką (nie czysty fetch).
+
+**Brak testów = zadanie nie jest ukończone.**
 
 ---
 
@@ -297,7 +313,7 @@ Nie wykonuj operacji git - zmiany przechodzą przez review człowieka.
 ```
 feat(1.2): docker-compose.yml + PostgreSQL + PostGIS
 feat(1.5): CorsConfig.java
-feat(2.3): IkeAgent refaktor na @EventListener @Async
+feat(2.3): NearbyUnitsAgent @EventListener @Async
 fix(1.9): poprawka encji Placowka — brakujące pole geom
 ```
 
@@ -323,7 +339,7 @@ Ogólna zasada minimalna dla każdego zadania backendowego:
 # 2. Baza dostępna i seed wykonany
 docker compose ps postgres   # status: healthy
 docker compose exec postgres psql -U lublin -d gis_dashboard \
-  -c "SELECT COUNT(*) FROM placowka;"   # oczekiwane: 48
+  -c "SELECT COUNT(*) FROM entity_registry;"   # oczekiwane: > 0
 
 # 3. Endpoint odpowiada
 curl -s http://localhost:8080/api/layers | jq '. | length'   # oczekiwane: 7

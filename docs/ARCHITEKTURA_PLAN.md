@@ -32,7 +32,7 @@
 1. **Database-first** — jedyne źródło danych runtime to PostgreSQL.
    Pliki seed (`*.sql`) służą wyłącznie do inicjalizacji bazy.
 
-2. **Event-driven** — zmiana stanu zagrożenia publikuje `ThreatUpdatedEvent`.
+2. **Event-driven** — wykrycie alertu publikuje `ThreatAlertEvent`.
    Agenci reagują przez `@EventListener @Async`. Kontrolery nigdy nie wywołują
    agentów bezpośrednio.
 
@@ -40,7 +40,7 @@
    Nowa warstwa = INSERT, zero zmian w kodzie.
 
 4. **Separation of concerns** — każdy agent ma jedną odpowiedzialność:
-   `FloodImportAgent` importuje, `IkeAgent` liczy IKE, `DecisionAgent` decyduje.
+   `ThreatAlertImportAgent` importuje alerty IMGW, `NearbyUnitsAgent` oblicza zasięg.
 
 5. **PostGIS jako silnik geospatialny** — `ST_DWithin`, `ST_Intersects`, `ST_Contains`
    w bazie, nie w Javie ani JavaScript.
@@ -136,7 +136,7 @@ volumes:
 ┌──────────────────────────────────────────────────────────────┐
 │                        Frontend                               │
 │  React 18 + React-Leaflet · Zustand · React Query            │
-│  ScenarioPanel · DecisionPanel · Top10Panel                  │
+│  AlertPanel · NearbyUnitsPanel · LayerControlPanel           │
 │  Web Speech API · Recharts                                    │
 └───────────────────────────┬──────────────────────────────────┘
                             │ REST (JSON) / WebSocket (STOMP)
@@ -148,23 +148,20 @@ volumes:
 │  ├── AdminBoundaryController POST /api/admin-boundaries/import│
 │  ├── EntityController   GET  /api/entities, /api/entities/{id}│
 │  ├── ImportController   POST /api/import/*                   │
-│  ├── IkeController      GET  /api/ike                        │
 │  ├── LayerConfigController GET /api/layers                   │
-│  ├── ThreatController   [planned] POST /api/threat/*         │
-│  ├── DecisionController [planned] GET  /api/decisions        │
-│  └── KalkulatorController [planned] POST /api/calculate/*    │
+│  ├── ThreatController   [planned v1.1] POST /api/threats/manual│
+│  └── KalkulatorController [planned v1.2] POST /api/calculate/*│
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐     │
 │  │           Decision Layer (Agents)                    │     │
 │  │                                                      │     │
 │  │  AdminBoundaryImportAgent (PRG WFS → granice_adm.)  │     │
-│  │  IkeAgent ◄── @EventListener(ThreatUpdatedEvent)    │     │
-│  │      └──publishes──► IkeRecalculatedEvent            │     │
+│  │  ThreatAlertImportAgent (@Scheduled IMGW + manual)  │     │
+│  │          └──publishes──► ThreatAlertEvent            │     │
+│  │  NearbyUnitsAgent ◄── @EventListener(ThreatAlertEvent)│    │
+│  │          └──publishes──► NearbyUnitsComputedEvent    │     │
+│  │  LiveFeedService ◄── ThreatAlertEvent + NearbyUnitsComputedEvent│
 │  │  WfsGmlParser (parser GML dla WFS)                  │     │
-│  │                                                      │     │
-│  │  [planned v1.1] FloodImportAgent → ThreatUpdatedEvent│     │
-│  │  [planned v1.1] DecisionAgent ◄── IkeRecalculatedEvent│    │
-│  │  [planned v1.1] LiveFeedService ◄── oba eventy       │     │
 │  └─────────────────────────────────────────────────────┘     │
 │                                                               │
 │  Services                                                     │
@@ -180,9 +177,9 @@ volumes:
 ┌───────────────────────────▼──────────────────────────────────┐
 │                PostgreSQL 15 + PostGIS                        │
 │  Jedyne źródło danych runtime.                               │
-│  placowka · entity_registry · entity_category · entity_source│
-│  strefy_zagrozen · ike_results · layer_config                │
-│  granice_administracyjne · miejsca_relokacji · ...           │
+│  entity_registry · entity_category · entity_source            │
+│  threat_alert · layer_config                                  │
+│  granice_administracyjne · ...                                │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -190,145 +187,71 @@ volumes:
 
 ## 4. Warstwa agentowa — szczegóły
 
-### 4.1 `ThreatUpdatedEvent`
+### 4.1 `ThreatAlertEvent`
+
+Publikowany przez `ThreatAlertImportAgent` gdy poziom wody > próg lub operator tworzy manualny alert.
 
 ```java
-// backend/src/main/java/pl/lublin/dashboard/event/ThreatUpdatedEvent.java
-public class ThreatUpdatedEvent extends ApplicationEvent {
-    private final String scenariusz;   // "Q10" | "Q100" | "Q500" | "pozar" | "blackout"
-    private final String obszar;       // kod powiatu lub bbox "lon_min,lat_min,lon_max,lat_max"
-    private final String zrodlo;       // "wfs" | "syntetyczne"
-    private final Instant timestamp;
-    private final String correlationId; // UUID — do korelacji logów między agentami
+public class ThreatAlertEvent extends ApplicationEvent {
+    private final Long alertId;
+    private final String threatType;    // "flood" | "fire" | "blackout"
+    private final String level;         // "warning" | "alarm" | "emergency"
+    private final String sourceApi;     // "imgw_hydro" | "manual"
+    private final Double lat;
+    private final Double lon;
+    private final Double radiusKm;
+    private final String correlationId;
+    // konstruktor + gettery
 }
 ```
 
-### 4.1a `IkeRecalculatedEvent`
+### 4.2 `NearbyUnitsComputedEvent`
 
-Publikowany przez `IkeAgent` po zakończeniu przeliczania IKE dla wszystkich placówek.
-Niesie gotowe wyniki — `DecisionAgent` i `LiveFeedService` mogą z nich skorzystać
-bez ponownego odpytywania bazy.
+Publikowany przez `NearbyUnitsAgent` po obliczeniu listy jednostek w zasięgu.
 
 ```java
-// backend/src/main/java/pl/lublin/dashboard/event/IkeRecalculatedEvent.java
-public class IkeRecalculatedEvent extends ApplicationEvent {
-    private final String correlationId;     // UUID z ThreatUpdatedEvent który wywołał obliczenie
-    private final Instant obliczoneO;       // kiedy zakończono obliczenia
-    private final int liczbaPrzetworzonych; // ile placówek przetworzono (łącznie — wliczając pominięte)
-    private final int liczbaZWynikiem;      // ile placówek ma ike_score != null
-    private final int liczbaNull;           // ile placówek dostało ike_score = null (E6/E11)
-    private final List<IkeResultSummary> wyniki; // gotowe wyniki — żeby listenery nie musiały odpytywać bazy
+public class NearbyUnitsComputedEvent extends ApplicationEvent {
+    private final String correlationId;
+    private final List<Long> entityIds;  // ID jednostek z entity_registry
+    private final String alertId;
+    // konstruktor + gettery
 }
 ```
 
-Typ pomocniczy `IkeResultSummary` — lekki widok wyniku (nie pełne DTO):
-
-```java
-public record IkeResultSummary(
-    String placowkaKod,
-    Double ikeScore,       // null gdy wykluczona (E6/E11)
-    String ikeKategoria,   // "czerwony" | "zolty" | "zielony" | "nieznany"
-    String celRelokacjiKod // null gdy brak miejsca relokacji
-) {}
-```
-
-**Zasada:** `DecisionAgent` i `LiveFeedService` słuchają wyłącznie `IkeRecalculatedEvent`,
-nie `ThreatUpdatedEvent`. Dzięki temu mają gwarancję, że IKE jest już obliczone zanim
-zaczną działać, i mogą użyć pola `wyniki` zamiast odpytywać bazę.
-
-### 4.2 `FloodImportAgent`
+### 4.3 `ThreatAlertImportAgent`
 
 ```
-Odpowiedzialność: import danych WFS → zapis do bazy → publikacja eventu
+Odpowiedzialność: polling IMGW hydro API → wykrycie przekroczenia progu → zapis threat_alert
 
-Wyzwalacz: HTTP POST /api/threat/flood/import
+Wyzwalacz: @Scheduled (co N minut z application.yml) + HTTP POST /api/threats/manual
 
 Algorytm:
-1. Pobierz GeoJSON z WFS ISOK/RZGW dla (obszar, scenariusz)
-   → jeśli WFS niedostępny (timeout/błąd) → użyj fallbacku syntetycznego, zloguj WARN
-2. Konwertuj GML → GeoJSON jeśli potrzeba
-3. Transformuj układ współrzędnych do EPSG:4326 jeśli inny
-4. Usuń istniejące strefy dla tego (obszar, scenariusz) z tabeli strefy_zagrozen
-5. Zapisz nowe strefy z zrodlo = 'wfs' lub 'syntetyczne'
-6. publisher.publishEvent(new ThreatUpdatedEvent(scenariusz, obszar, zrodlo, now(), UUID))
+1. GET https://danepubliczne.imgw.pl/api/data/hydro → lista stacji z odczytami
+2. Dla każdej stacji z poziomem > progu ostrzegawczego:
+   a. Sprawdź czy alert już istnieje (external_id + is_active=true) — jeśli tak, pomiń
+   b. INSERT do threat_alert (source_api='imgw_hydro', threat_type='flood', level, geom, ...)
+   c. publisher.publishEvent(new ThreatAlertEvent(...))
+3. Oznacz nieaktywne alerty (stacje poniżej progu) jako is_active=false
 ```
 
-**WFS endpoint ISOK (docelowy):**
-```
-https://hydro.imgw.pl/model/gis/wfs?
-  service=WFS&version=1.0.0&request=GetFeature
-  &typeName=STREFAQ100    (lub Q10, Q500)
-  &bbox={bbox}
-  &srsName=EPSG:2180
-```
-
-**Fallback syntetyczny:**
-Generuj prostokąty wzdłuż koryt rzek na podstawie bounding boxa powiatu.
-Zapisuj z `zrodlo = 'syntetyczne'`. Dane syntetyczne wystarczają do demonstracji
-pełnego flow event-driven.
-
-### 4.3 `IkeAgent`
+### 4.4 `NearbyUnitsAgent`
 
 ```
-Odpowiedzialność: przeliczenie IKE dla wszystkich placówek po zmianie zagrożenia
+Odpowiedzialność: PostGIS ST_DWithin → lista jednostek w zasięgu alertu
 
-Wyzwalacz: @EventListener(ThreatUpdatedEvent) + @Async
+Wyzwalacz: @EventListener(ThreatAlertEvent) + @Async
 
 Algorytm:
-1. Pobierz wszystkie placówki z tabeli placowka
-2. Dla każdej placówki oblicz IKE (szczegóły: docs/IKE_ALGORITHM.md)
-3. Upsert wyników do tabeli ike_results
-4. publisher.publishEvent(new IkeRecalculatedEvent(correlationId))
-
-Uwaga: @Async — działa w osobnym wątku, nie blokuje wątku HTTP.
+1. SELECT entity_registry WHERE ST_DWithin(geom, alert.geom, radiusKm * 1000)
+2. publisher.publishEvent(new NearbyUnitsComputedEvent(correlationId, entityIds, alertId))
 ```
-
-### 4.4 `DecisionAgent`
-
-```
-Odpowiedzialność: generowanie rekomendacji ewakuacyjnych na podstawie IKE
-
-Wyzwalacz: @EventListener(IkeRecalculatedEvent) + @Async
-           ↑ Słucha IkeRecalculatedEvent, nie ThreatUpdatedEvent — gwarancja
-             że IKE jest już obliczone. Wyniki dostępne w event.getWyniki().
-
-Algorytm:
-1. Pobierz wyniki IKE z event.getWyniki() (bez dodatkowego zapytania do bazy)
-2. Dla placówek z IKE >= 0.70: rekomendacja = 'ewakuuj_natychmiast'
-3. Dla IKE 0.40-0.69: rekomendacja = 'przygotuj_ewakuacje'
-4. Dla IKE < 0.40: rekomendacja = 'monitoruj'
-5. Dla IKE = null (ike_kategoria = 'nieznany'): pomijaj — brak rekomendacji
-6. Uzasadnienie: wygeneruj na podstawie składowych score_* z tabeli ike_results
-   (pobierz tylko dla placówek z rekomendacją 'ewakuuj_natychmiast' i 'przygotuj')
-7. Zapisz do tabeli evacuation_decisions z tym samym correlation_id
-```
-
-**Wzorzec event-driven między agentami:**
-`IkeAgent` → publikuje `IkeRecalculatedEvent` → `DecisionAgent` + `LiveFeedService` słuchają.
-Dzięki temu `DecisionAgent` zawsze ma gwarancję świeżych danych IKE i może użyć
-`event.getWyniki()` zamiast ponownie odpytywać bazę.
 
 ### 4.5 `LiveFeedService`
 
 ```
-Odpowiedzialność: push aktualizacji przez WebSocket do wszystkich podłączonych klientów
-
 Wyzwalacze:
-  @EventListener(ThreatUpdatedEvent)   + @Async  →  push stref zagrożeń
-  @EventListener(IkeRecalculatedEvent) + @Async  →  push wyników IKE + rekomendacji
-
-Działanie po ThreatUpdatedEvent:
-  - Pobierz świeże strefy z bazy (SELECT * FROM strefy_zagrozen WHERE correlation_id = ?)
-  - Push do /topic/layers/L-03 — sygnał LAYER_UPDATED (nie pełny GeoJSON; frontend
-    wykonuje invalidateQueries i pobiera dane przez GET /api/layers/L-03)
-  - Push do /topic/system — typ: THREAT_IMPORT_COMPLETED (lub THREAT_CLEARED)
-
-Działanie po IkeRecalculatedEvent:
-  - Użyj event.getWyniki() — bez dodatkowego zapytania do bazy
-  - Push do /topic/ike — lista IkeResultSummary wzbogacona o pola potrzebne frontendowi
-  - Pobierz rekomendacje z bazy (SELECT * FROM evacuation_decisions WHERE correlation_id = ?)
-  - Push do /topic/decisions — lista EvacuationDecision DTO
-  - Push do /topic/system — typ: IKE_RECALCULATED, DECISIONS_GENERATED
+  @EventListener(ThreatAlertEvent)         → push /topic/threat-alerts
+  @EventListener(NearbyUnitsComputedEvent) → push /topic/nearby-units
 ```
 
 ---
@@ -382,11 +305,10 @@ Działanie po IkeRecalculatedEvent:
 │       │   │
 │       │   ├── panels/
 │       │   │   ├── LayerControlPanel.tsx
-│       │   │   ├── EntityFilterPanel.tsx   # ★ filtry jednostek (typ, powiat, IKE)
+│       │   │   ├── EntityFilterPanel.tsx   # ★ filtry jednostek (typ, powiat)
 │       │   │   ├── RegionInfoPanel.tsx
-│       │   │   ├── ScenarioPanel.tsx       # [planned] wybór scenariusza zagrożenia
-│       │   │   ├── DecisionPanel.tsx       # [planned] rekomendacje DecisionAgent
-│       │   │   └── Top10Panel.tsx          # [planned] lista Top 10 IKE
+│       │   │   ├── AlertPanel.tsx          # [planned v1.1] lista aktywnych alertów IMGW
+│       │   │   └── NearbyUnitsPanel.tsx    # [planned v1.1] jednostki w zasięgu alertu
 │       │   │
 │       │   ├── calculators/               # [planned v1.2]
 │       │   │   ├── CalculatorHub.tsx
@@ -432,15 +354,14 @@ Działanie po IkeRecalculatedEvent:
 │       │   ├── DashboardApplication.java
 │       │   │
 │       │   ├── event/                           # [planned v1.1]
-│       │   │   ├── ThreatUpdatedEvent.java      # centralny event
-│       │   │   └── IkeRecalculatedEvent.java    # event po przeliczeniu IKE
+│       │   │   ├── ThreatAlertEvent.java        # centralny event alertu
+│       │   │   └── NearbyUnitsComputedEvent.java # event po obliczeniu zasięgu
 │       │   │
 │       │   ├── agent/                           # ★ warstwa agentowa
 │       │   │   ├── AdminBoundaryImportAgent.java# ★ import granic z GUGiK PRG WFS
-│       │   │   ├── IkeAgent.java                # ★ @EventListener → obliczanie IKE
-│       │   │   ├── WfsGmlParser.java            # ★ parser GML dla WFS
-│       │   │   ├── FloodImportAgent.java        # [planned v1.2] import WFS → ThreatUpdatedEvent
-│       │   │   └── DecisionAgent.java           # [planned v1.1] @EventListener → rekomendacje
+│       │   │   ├── ThreatAlertImportAgent.java  # [planned v1.1] @Scheduled IMGW + manual
+│       │   │   ├── NearbyUnitsAgent.java        # [planned v1.1] @EventListener → ST_DWithin
+│       │   │   └── WfsGmlParser.java            # ★ parser GML dla WFS
 │       │   │
 │       │   ├── config/
 │       │   │   ├── WebSocketConfig.java
@@ -454,9 +375,7 @@ Działanie po IkeRecalculatedEvent:
 │       │   │   ├── EntityController.java        # ★ GET /api/entities, /api/entities/{id}
 │       │   │   ├── ImportController.java        # ★ POST /api/import/*
 │       │   │   ├── LayerConfigController.java
-│       │   │   ├── IkeController.java
-│       │   │   ├── ThreatController.java        # [planned v1.1] POST /api/threat/*
-│       │   │   ├── DecisionController.java      # [planned v1.1] GET /api/decisions
+│       │   │   ├── ThreatController.java        # [planned v1.1] POST /api/threats/manual
 │       │   │   ├── KalkulatorController.java    # [planned v1.2]
 │       │   │   └── ScraperController.java       # [planned v1.2]
 │       │   │
@@ -475,34 +394,24 @@ Działanie po IkeRecalculatedEvent:
 │       │   │   └── GeocodingService.java        # [planned]
 │       │   │
 │       │   ├── repository/
-│       │   │   ├── PlacowkaRepository.java
 │       │   │   ├── GranicaAdministracyjnaRepository.java # ★ granice_administracyjne
 │       │   │   ├── EntityRegistryEntryRepository.java    # ★ entity_registry
 │       │   │   ├── EntityCategoryRepository.java         # ★ entity_category
 │       │   │   ├── EntitySourceRepository.java           # ★ entity_source
 │       │   │   ├── EntityAliasRepository.java            # ★ entity_alias
 │       │   │   ├── EntityImportBatchRepository.java      # ★ entity_import_batch
-│       │   │   ├── StrefaZagrozenRepository.java
-│       │   │   ├── IkeResultRepository.java
-│       │   │   ├── MiejsceRelokacjiRepository.java
-│       │   │   ├── ZasobTransportuRepository.java
-│       │   │   ├── LayerConfigRepository.java
-│       │   │   └── EvacuationDecisionRepository.java     # [planned v1.1]
+│       │   │   ├── ThreatAlertRepository.java            # [planned v1.1]
+│       │   │   └── LayerConfigRepository.java
 │       │   │
 │       │   ├── model/
 │       │   │   ├── GranicaAdministracyjna.java  # ★ encja granice_administracyjne
-│       │   │   ├── Placowka.java                # ★ operacyjna tabela jednostek ochrony ludności
 │       │   │   ├── EntityRegistryEntry.java     # ★ ujednolicony rejestr podmiotów (entity_registry)
 │       │   │   ├── EntityCategory.java          # ★ kategorie podmiotów (DPS, dom_dziecka, hospicjum…)
 │       │   │   ├── EntitySource.java            # ★ źródła danych (mpips, BIP, WFS…)
 │       │   │   ├── EntityAlias.java             # ★ alternatywne nazwy/kody podmiotów
 │       │   │   ├── EntityImportBatch.java       # ★ log importu partii podmiotów
-│       │   │   ├── StrefaZagrozen.java
-│       │   │   ├── IkeResult.java
-│       │   │   ├── MiejsceRelokacji.java
-│       │   │   ├── ZasobTransportu.java
-│       │   │   ├── LayerConfig.java
-│       │   │   └── EvacuationDecision.java      # [planned v1.1] rekomendacja ewakuacyjna
+│       │   │   ├── ThreatAlert.java             # [planned v1.1] alert zagrożenia
+│       │   │   └── LayerConfig.java
 │       │   │
 │       │   ├── handlers/
 │       │   │   └── SocketConnectionHandler.java # ★ obsługa połączeń WebSocket
@@ -549,7 +458,7 @@ public class AsyncConfig {
     @Bean(name = "agentTaskExecutor")
     public TaskExecutor agentTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);      // IkeAgent, DecisionAgent, LiveFeedService
+        executor.setCorePoolSize(3);      // ThreatAlertImportAgent, NearbyUnitsAgent, LiveFeedService
         executor.setMaxPoolSize(6);
         executor.setQueueCapacity(25);
         executor.setThreadNamePrefix("agent-");
@@ -563,7 +472,7 @@ Każdy listener używa tej puli:
 ```java
 @Async("agentTaskExecutor")
 @EventListener
-public void onThreatUpdated(ThreatUpdatedEvent event) { ... }
+public void onThreatAlert(ThreatAlertEvent event) { ... }
 ```
 
 ---
@@ -572,32 +481,24 @@ public void onThreatUpdated(ThreatUpdatedEvent event) { ... }
 
 Pełne DDL: `docs/DATA_SCHEMA.md`.
 
-### Nowa tabela: `evacuation_decisions`
+### Nowa tabela: `threat_alert`
 
 ```sql
-CREATE TABLE evacuation_decisions (
-    id                   SERIAL PRIMARY KEY,
-    placowka_kod         VARCHAR(20) REFERENCES placowka(kod),
-    ike_score            DECIMAL(5,4),
-    rekomendacja         VARCHAR(30) CHECK (rekomendacja IN (
-                           'ewakuuj_natychmiast', 'przygotuj_ewakuacje', 'monitoruj'
-                         )),
-    cel_relokacji_kod    VARCHAR(20) REFERENCES miejsca_relokacji(kod),
-    uzasadnienie         TEXT,
-    zatwierdzona         BOOLEAN DEFAULT NULL,   -- NULL=oczekuje, TRUE=zatwierdzona, FALSE=odrzucona
-    correlation_id       VARCHAR(36),            -- UUID z ThreatUpdatedEvent
-    wygenerowano_o       TIMESTAMPTZ DEFAULT NOW()
+CREATE TABLE threat_alert (
+    id            BIGSERIAL PRIMARY KEY,
+    external_id   VARCHAR(100),                 -- ID stacji IMGW lub UUID manualny
+    source_api    VARCHAR(30) NOT NULL,         -- 'imgw_hydro' | 'manual'
+    threat_type   VARCHAR(20) NOT NULL,         -- 'flood' | 'fire' | 'blackout'
+    level         VARCHAR(20) NOT NULL,         -- 'warning' | 'alarm' | 'emergency'
+    geom          GEOMETRY(Point, 4326),
+    radius_km     DECIMAL(8,2),
+    is_active     BOOLEAN DEFAULT TRUE,
+    correlation_id VARCHAR(36),
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_decisions_placowka ON evacuation_decisions(placowka_kod);
-CREATE INDEX idx_decisions_correlation ON evacuation_decisions(correlation_id);
-```
-
-### Zmiana w tabeli `strefy_zagrozen`
-
-```sql
-ALTER TABLE strefy_zagrozen
-    ADD COLUMN IF NOT EXISTS scenariusz VARCHAR(10),  -- 'Q10' | 'Q100' | 'Q500' | 'pozar_maly' itp.
-    ADD COLUMN IF NOT EXISTS correlation_id VARCHAR(36);
+CREATE INDEX idx_threat_alert_active ON threat_alert(is_active);
+CREATE INDEX idx_threat_alert_geom ON threat_alert USING GIST(geom);
 ```
 
 ---
@@ -627,10 +528,13 @@ Poniżej wyłącznie cele iteracji (co i dlaczego), bez listy kroków:
 
 | Iteracja | Cel |
 |---|---|
-| **v1.0 — Fundament GIS** | Działająca mapa z jednostkami ochrony ludności. Spring Boot serwuje dane z PostgreSQL przez REST. Entity registry dla ujednoliconego rejestru podmiotów. IKE liczone na żądanie. |
-| **v1.1 — Event-driven core** | Pełny flow: wybór scenariusza → ThreatUpdatedEvent → IKE → IkeRecalculatedEvent → rekomendacje + WebSocket push. |
-| **v1.2 — Import i kalkulatory** | Prawdziwy import WFS ISOK z fallbackiem syntetycznym. Trzy kalkulatory zasobów. Scraper HTML/XLSX. |
-| **v1.3 — UX i głos** | Asystent głosowy (Web Speech API + Whisper). Pełny Docker stack produkcyjny. |
+| **v1.0 — Fundament GIS** | Mapa, entity registry, granice PRG. ✅ |
+| **REVISION 2** | Usunięcie legacy (IKE, DPS, test-only layers). |
+| **REVISION 1** | UX fixes: layer selection per warstwa, viewport. |
+| **DT-LOGS-TESTS** | Logi + testy dla istniejących serwisów. |
+| **v1.1 — Zasoby + Alerty** | resource_type, entity_resources, threat_alert, ThreatAlertImportAgent (IMGW), NearbyUnitsAgent, WebSocket push. |
+| **v1.2 — Importy API** | PSP/PRM/RPWDL bulk import + geokodowanie Nominatim + clustering. |
+| **v1.3 — UX i głos** | Asystent głosowy + Docker prod. |
 
 ---
 
@@ -638,10 +542,9 @@ Poniżej wyłącznie cele iteracji (co i dlaczego), bez listy kroków:
 
 | Ryzyko | Mitygacja |
 |---|---|
-| WFS ISOK niedostępny / zmienia schemat | Fallback syntetyczny; cache ostatniego importu w bazie |
+| IMGW API niedostępne / zmienia schemat | Logi WARN + retry z exponential backoff; cache ostatnich odczytów w bazie |
 | `@Async` — trudniejsze debugowanie | Correlation ID w każdym evencie; szczegółowe logowanie agentów |
-| Race condition: DecisionAgent czyta IKE zanim IkeAgent skończy | DecisionAgent słucha `IkeRecalculatedEvent`, nie `ThreatUpdatedEvent` |
-| PostGIS wolne przy dużej liczbie placówek | Indeksy GiST; batch processing w IkeAgent |
+| PostGIS wolne przy dużej liczbie jednostek | Indeksy GiST na geom; ST_DWithin z indeksem przestrzennym |
 | GML z WFS w nieoczekiwanym układzie EPSG | Zawsze jawna transformacja w `WfsClientService` przed zapisem |
 | PRG WFS niedostępny / zmienia schemat TypeName | Weryfikacja przez `GetCapabilities`; w przypadku błędu — 503 z instrukcją ręcznego importu |
 | L-10 (gminy ~2477) zbyt wolne bez uproszczenia geometrii | Wymagany filtr `kod_woj` lub `bbox`; potencjalne ST_Simplify jako DT |
