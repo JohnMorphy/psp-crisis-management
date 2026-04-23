@@ -154,7 +154,7 @@ done
 
 # Weryfikacja
 docker compose exec postgres psql -U ${POSTGRES_USER:-lublin} -d ${POSTGRES_DB:-gis_dashboard} \
-  -c "SELECT COUNT(*) as placowki FROM placowka;"
+  -c "SELECT COUNT(*) as placowki FROM entity_category;"
 # Oczekiwany output: 48
 ```
 

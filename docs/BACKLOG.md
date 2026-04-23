@@ -19,33 +19,9 @@ Wszystkie zadania 1.1–1.12 ukończone. Deliverable:
 
 ---
 
-## ✅ REVISION 2 — Usunięcie legacy
+## ✅ REVISION 1 — UX fixes
 
-> Wykonane przez plan `docs/superpowers/plans/2026-04-22-concept-redesign.md`.
-
-### ✅ R2.1 — Backend legacy removal
-
-Usunięto: Placowka, IkeAgent, IkeResult, IkeController, StrefaZagrozen, MiejsceRelokacji, ZasobTransportu, ike.config.json, seed files 02/04/05/06.
-Zaktualizowano: GeoService.java (bez legacy repos), EntityRegistryService.java (bez ike_score/ike_kategoria), 01_schema.sql (bez legacy tabel), 03_seed_layers.sql (L-01/L-02 dla nowej architektury).
-Weryfikacja: `./mvnw compile -q` → BUILD SUCCESS ✅
-
-### ✅ R2.2 — Frontend legacy removal
-
-Usunięto: ThreatZoneLayer.tsx, IKE coloring w EntityLayer.tsx, IKE sekcja w EntityPopup.tsx, typy IkeCategory/ThreatZoneProperties w gis.ts.
-Zaktualizowano: MapContainer.tsx (viewport całej Polski), EntityLayer.tsx (CATEGORY_COLORS).
-Weryfikacja: `npm run build` → 0 błędów TypeScript ✅
-
-### ✅ R2.3 — Docs update
-
-Zaktualizowano: CLAUDE.md, PRD.md, ARCHITEKTURA_PLAN.md, DATA_SCHEMA.md, API_REFERENCE.md.
-Usunięto: IKE_ALGORITHM.md.
-Weryfikacja: brak słowa "IKE" jako aktywna funkcja w dokumentacji.
-
----
-
-## ⬜ REVISION 1 — UX fixes
-
-### ⬜ R1.1 — Fix layer selection per warstwa
+### ✅ R1.1 — Fix layer selection per warstwa
 
 **Problem:** Jeden `selectedRegion` w mapStore podświetla naraz wiele warstw — po kliknięciu województwa i powiatu oba są podświetlone.
 
@@ -72,6 +48,30 @@ Szczegóły implementacji: Task 9 w `docs/superpowers/plans/2026-04-22-concept-r
 ```
 
 **Commit:** `feat(R1): fix layer selection — selectedFeatureByLayer, cross-layer style reset`
+
+---
+
+## ✅ REVISION 2 — Usunięcie legacy
+
+> Wykonane przez plan `docs/superpowers/plans/2026-04-22-concept-redesign.md`.
+
+### ✅ R2.1 — Backend legacy removal
+
+Usunięto: Placowka, IkeAgent, IkeResult, IkeController, StrefaZagrozen, MiejsceRelokacji, ZasobTransportu, ike.config.json, seed files 02/04/05/06.
+Zaktualizowano: GeoService.java (bez legacy repos), EntityRegistryService.java (bez ike_score/ike_kategoria), 01_schema.sql (bez legacy tabel), 03_seed_layers.sql (L-01/L-02 dla nowej architektury).
+Weryfikacja: `./mvnw compile -q` → BUILD SUCCESS ✅
+
+### ✅ R2.2 — Frontend legacy removal
+
+Usunięto: ThreatZoneLayer.tsx, IKE coloring w EntityLayer.tsx, IKE sekcja w EntityPopup.tsx, typy IkeCategory/ThreatZoneProperties w gis.ts.
+Zaktualizowano: MapContainer.tsx (viewport całej Polski), EntityLayer.tsx (CATEGORY_COLORS).
+Weryfikacja: `npm run build` → 0 błędów TypeScript ✅
+
+### ✅ R2.3 — Docs update
+
+Zaktualizowano: CLAUDE.md, PRD.md, ARCHITEKTURA_PLAN.md, DATA_SCHEMA.md, API_REFERENCE.md.
+Usunięto: IKE_ALGORITHM.md.
+Weryfikacja: brak słowa "IKE" jako aktywna funkcja w dokumentacji.
 
 ---
 
@@ -132,7 +132,7 @@ cd backend
 
 ---
 
-## ⬜ v1.1 — Zasoby + Alerty zagrożeń
+## ⬜ ITERATION v1.1 — Zasoby + Alerty zagrożeń
 
 **Cel:** Operator widzi zasoby każdej jednostki na mapie i może filtrować po typie zasobu. Alert z IMGW (poziom wody > próg) automatycznie podświetla jednostki w zasięgu.
 
@@ -502,7 +502,7 @@ Wywołuje `POST /api/threats/manual`. Spinner podczas czekania.
 
 ---
 
-## ⬜ v1.2 — Importy z publicznych API
+## ⬜ ITERATION v1.2 — Importy z publicznych API
 
 **Cel:** Rzeczywiste dane jednostek PSP, PRM i podmiotów leczniczych z polskich rejestrów.
 
@@ -564,7 +564,7 @@ Szpitale, SPZOZ, hospicja. Parsowanie XLSX przez Apache POI.
 
 ---
 
-## ⬜ v1.3 — UX i głos
+## ⬜ ITERATION v1.3 — UX i głos
 
 ### ⬜ 4.1 — Asystent głosowy
 

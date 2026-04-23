@@ -216,8 +216,8 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 | Iteracja | Status | Deliverable |
 |---|---|---|
 | v1.0 — Fundament GIS | ✅ Ukończona (1.1–1.12 ✅) | Mapa + granice (PL) + entity registry + Spring Boot + PostGIS |
-| REVISION 2 | ⬜ | Legacy removal (IKE, DPS tables, test-only layers) + docs update |
-| REVISION 1 | ⬜ | UX fixes: layer selection per warstwa, viewport |
+| REVISION 2 | ✅ | Legacy removal (IKE, DPS tables, test-only layers) + docs update |
+| REVISION 1 | ✅ | UX fixes: layer selection per warstwa, viewport |
 | DT-LOGS-TESTS | ⬜ | Logi + testy dla istniejących serwisów |
 | v1.1 — Zasoby + Alerty | ⬜ | resource_type, entity_resources, threat_alert, ThreatAlertImportAgent (IMGW), NearbyUnitsAgent, WebSocket |
 | v1.2 — Importy API | ⬜ | PSP, PRM, RPWDL bulk import + Nominatim geokodowanie + clustering |
@@ -314,7 +314,7 @@ Nie wykonuj operacji git - zmiany przechodzą przez review człowieka.
 feat(1.2): docker-compose.yml + PostgreSQL + PostGIS
 feat(1.5): CorsConfig.java
 feat(2.3): NearbyUnitsAgent @EventListener @Async
-fix(1.9): poprawka encji Placowka — brakujące pole geom
+fix(1.9): poprawka encji entity_category — brakujące pole
 ```
 
 Prefiks: `feat` dla nowego kodu, `fix` dla poprawek, `docs` dla dokumentacji.
