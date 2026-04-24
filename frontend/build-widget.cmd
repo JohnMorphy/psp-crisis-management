@@ -1,0 +1,1 @@
+npm run build && xcopy dist\* ..\mendix-widget\src\assets\ /E /I /Y
