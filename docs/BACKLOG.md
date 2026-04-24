@@ -38,8 +38,6 @@ setSelectedFeatureForLayer: (layerId: BoundaryLayerId, featureId: string | null)
 // setSelectedFeatureForLayer czyści pozostałe warstwy → cross-layer reset stylu
 ```
 
-Szczegóły implementacji: Task 9 w `docs/superpowers/plans/2026-04-22-concept-redesign.md`.
-
 **Weryfikacja:**
 ```
 ☐ Kliknięcie województwa → tylko województwo podświetlone
@@ -52,8 +50,6 @@ Szczegóły implementacji: Task 9 w `docs/superpowers/plans/2026-04-22-concept-r
 ---
 
 ## ✅ REVISION 2 — Usunięcie legacy
-
-> Wykonane przez plan `docs/superpowers/plans/2026-04-22-concept-redesign.md`.
 
 ### ✅ R2.1 — Backend legacy removal
 
@@ -275,6 +271,7 @@ docker compose exec postgres psql -U lublin -d gis_dashboard \
 ### ⬜ 2.3 — ThreatAlertImportAgent + ThreatAlertEvent + endpoint manual
 
 **Pliki do stworzenia:**
+
 - `backend/.../event/ThreatAlertEvent.java`
 - `backend/.../event/NearbyUnitsComputedEvent.java`
 - `backend/.../config/AsyncConfig.java`

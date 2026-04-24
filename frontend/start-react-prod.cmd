@@ -1,0 +1,1 @@
+npm run build && npx serve dist -l 5173

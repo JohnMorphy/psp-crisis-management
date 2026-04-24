@@ -1,4 +1,4 @@
-# ARCHITEKTURA_PLAN.md — Inteligentna Mapa Województwa Lubelskiego
+# ARCHITEKTURA_PLAN.md — Ogólnopolski Dashboard Jednostek Ochrony Ludności
 
 > Wersja: 1.3 · Data: 2026-04-14
 
