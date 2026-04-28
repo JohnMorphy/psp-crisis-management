@@ -136,3 +136,15 @@ CREATE TABLE IF NOT EXISTS entity_alias (
     match_confidence DECIMAL(4, 3),
     UNIQUE (entity_id, alias_type, alias_value)
 );
+
+-- Mendix unit geo-cache: stores only geometry for spatial queries.
+-- Full unit details are fetched from Mendix REST API on demand (proxied by MendixUnitsController).
+CREATE TABLE IF NOT EXISTS mendix_unit_cache (
+    mendix_id     VARCHAR(255) PRIMARY KEY,
+    geom          GEOMETRY(Point, 4326) NOT NULL,
+    category_code VARCHAR(100) NOT NULL,
+    synced_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mendix_unit_cache_geom
+    ON mendix_unit_cache USING GIST (geom);

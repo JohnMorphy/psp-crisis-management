@@ -402,3 +402,30 @@ CREATE INDEX IF NOT EXISTS idx_threat_alert_ext    ON threat_alert(source_api, e
 ```
 
 Zastępuje `strefy_zagrozen` — dane z realnych API, nie syntetyczne poligony.
+
+---
+
+## `mendix_unit_cache` — Mendix geo-cache
+
+Przechowuje TYLKO geometrię i kategorię jednostek Mendix. Szczegóły biznesowe (nazwa, adres, telefon) zawsze z Mendix REST API (proxied przez `MendixUnitsController`).
+
+```sql
+CREATE TABLE IF NOT EXISTS mendix_unit_cache (
+    mendix_id     VARCHAR(255) PRIMARY KEY,
+    geom          GEOMETRY(Point, 4326) NOT NULL,
+    category_code VARCHAR(100) NOT NULL,
+    synced_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mendix_unit_cache_geom
+    ON mendix_unit_cache USING GIST (geom);
+```
+
+| Kolumna | Typ | Opis |
+|---|---|---|
+| `mendix_id` | VARCHAR(255) PK | ID jednostki z Mendix REST API |
+| `geom` | GEOMETRY(Point,4326) | Lokalizacja (WGS84) — do spatial queries ST_DWithin |
+| `category_code` | VARCHAR(100) | Kategoria jednostki (np. `psp`, `osp`) |
+| `synced_at` | TIMESTAMPTZ | Czas ostatniej synchronizacji z Mendix |
+
+**Uwaga:** Tabela wypełniana przez `MendixImportAgent` (status: 🔴 ZABLOKOWANE — wymaga dokumentacji Mendix REST API).

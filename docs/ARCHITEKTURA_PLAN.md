@@ -156,6 +156,7 @@ volumes:
 │  │           Decision Layer (Agents)                    │     │
 │  │                                                      │     │
 │  │  AdminBoundaryImportAgent (PRG WFS → granice_adm.)  │     │
+│  │  MendixImportAgent (@Scheduled → mendix_unit_cache) 🔴│   │
 │  │  ThreatAlertImportAgent (@Scheduled IMGW + manual)  │     │
 │  │          └──publishes──► ThreatAlertEvent            │     │
 │  │  NearbyUnitsAgent ◄── @EventListener(ThreatAlertEvent)│    │
@@ -246,7 +247,15 @@ Algorytm:
 2. publisher.publishEvent(new NearbyUnitsComputedEvent(correlationId, entityIds, alertId))
 ```
 
-### 4.5 `LiveFeedService`
+### 4.5 `MendixImportAgent`
+
+```
+Klasa: MendixImportAgent
+Odpowiedzialność: Polling Mendix REST API → upsert geom+category do mendix_unit_cache
+Wyzwalacz: @Scheduled co N minut (🔴 ZABLOKOWANE — wymaga docs Mendix API)
+```
+
+### 4.6 `LiveFeedService`
 
 ```
 Wyzwalacze:
@@ -269,81 +278,45 @@ Wyzwalacze:
 ├── .env.example
 ├── .gitignore
 │
-├── frontend/
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   ├── Dockerfile
-│   ├── nginx.conf
+├── frontend/                         ← CAŁY frontend (npm workspaces root)
+│   ├── package.json                    ← workspace root: workspaces: [shared, app, widget]
+│   ├── node_modules/                   ← hoisted workspace deps
 │   │
-│   └── src/
-│       ├── main.tsx
-│       ├── App.tsx
-│       │
-│       ├── types/
-│       │   └── gis.ts                  # typy GeoJSON + FacilityProperties + ThreatZoneProperties
-│       │
-│       ├── components/
-│       │   ├── layout/
-│       │   │   ├── AppShell.tsx
-│       │   │   ├── Header.tsx
-│       │   │   ├── Footer.tsx              # ★ przyciski: zwiń panel, import, reset, kalkulatory
-│       │   │   └── NotificationList.tsx    # ★ toast lista — pozycja absolute top-20 right-4
-│       │   │
-│       │   ├── map/
-│       │   │   ├── MapContainer.tsx
-│       │   │   ├── EntityPopup.tsx         # ★ popup Leaflet dla każdej jednostki ochrony ludności
-│       │   │   └── layers/
-│       │   │       ├── EntityLayer.tsx         # ★ markery jednostek ochrony ludności (L-01)
-│       │   │       ├── ThreatZoneLayer.tsx     # strefy zagrożenia (L-03)
-│       │   │       ├── AdminBoundaryLayer.tsx  # ★ L-08/L-09/L-10 — 3 poziomy admin
-│       │   │       ├── HeatmapLayer.tsx        # [planned] L-02
-│       │   │       ├── DrogiLayer.tsx          # [planned] L-04
-│       │   │       ├── TransportLayer.tsx      # [planned] L-05
-│       │   │       ├── RelokacjaLayer.tsx      # [planned] L-06
-│       │   │       └── BialePlamiLayer.tsx     # [planned] L-07
-│       │   │
-│       │   ├── panels/
-│       │   │   ├── LayerControlPanel.tsx
-│       │   │   ├── EntityFilterPanel.tsx   # ★ filtry jednostek (typ, powiat)
-│       │   │   ├── RegionInfoPanel.tsx
-│       │   │   ├── AlertPanel.tsx          # [planned v1.1] lista aktywnych alertów IMGW
-│       │   │   └── NearbyUnitsPanel.tsx    # [planned v1.1] jednostki w zasięgu alertu
-│       │   │
-│       │   ├── calculators/               # [planned v1.2]
-│       │   │   ├── CalculatorHub.tsx
-│       │   │   ├── TransportCalculator.tsx
-│       │   │   ├── RelocationCalculator.tsx
-│       │   │   └── ThreatSpreadCalculator.tsx
-│       │   │
-│       │   └── voice/                     # [planned v1.3]
-│       │       ├── VoiceAssistant.tsx
-│       │       ├── VoiceButton.tsx
-│       │       └── CommandParser.ts
-│       │
-│       ├── store/
-│       │   ├── mapStore.ts                 # ★ activeLayers, selectedRegion, isPanelCollapsed
-│       │   └── notificationStore.ts        # ★ notifications[], addNotification, removeNotification
-│       │
-│       ├── hooks/
-│       │   ├── useLayerData.ts
-│       │   ├── useEntityLayerData.ts       # ★ hook dla EntityLayer (entity_registry)
-│       │   ├── useAdminBoundaries.ts       # ★ hook dla L-08/L-09/L-10 z filtrem
-│       │   ├── importAdminBoundaries.ts    # wywołanie POST /api/admin-boundaries/import + powiadomienia
-│       │   ├── useWebSocket.ts             # [planned]
-│       │   ├── useFilters.ts               # [planned]
-│       │   └── useVoiceCommands.ts         # [planned v1.3]
-│       │
-│       ├── services/
-│       │   ├── api.ts
-│       │   ├── websocketService.ts         # [planned]
-│       │   ├── geocoder.ts                 # [planned]
-│       │   └── routingService.ts           # [planned]
-│       │
-│       └── utils/
-│           ├── colorScale.ts               # [planned]
-│           ├── formatters.ts               # [planned]
-│           └── geoUtils.ts                 # [planned]
+│   ├── shared/                         ← @psp/shared: czyste React+TS, zero Vite/Mendix
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── index.ts                    ← barrel export
+│   │       ├── GisMapApp.tsx               ← root komponent (props: apiBaseUrl, initialZoom)
+│   │       ├── services/
+│   │       │   ├── api.ts                  ← createApiClient(baseUrl)
+│   │       │   └── ApiContext.tsx          ← React Context dla axios instance
+│   │       ├── components/
+│   │       │   ├── layout/                 ← Header, AppShell, NotificationList
+│   │       │   ├── map/                    ← MapContainer, EntityPopup
+│   │       │   ├── map/layers/             ← EntityLayer, AdminBoundaryLayer
+│   │       │   └── panels/                 ← LayerControlPanel, EntityFilterPanel, RegionInfoPanel
+│   │       ├── hooks/                      ← useLayerData, useAdminBoundaries, useEntityLayerData...
+│   │       ├── store/                      ← mapStore, notificationStore
+│   │       └── types/
+│   │           └── gis.ts
+│   │
+│   ├── app/                            ← standalone Vite (dev + demo bez Mendix)
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   ├── index.html
+│   │   └── src/
+│   │       ├── main.tsx                ← thin shell: VITE_API_BASE_URL → GisMapApp
+│   │       └── index.css               ← Tailwind + @source dla shared/
+│   │
+│   └── widget/                         ← Mendix pluggable widget
+│       ├── package.json
+│       ├── rollup.config.js            ← custom: babel plugin stripuje TS/JSX z @psp/shared
+│       └── src/
+│           ├── GisMap.tsx              ← thin shell: props Mendix → GisMapApp
+│           ├── GisMap.xml             ← deklaracja właściwości widżetu
+│           └── ui/
+│               └── GisMap.css
 │
 ├── backend/
 │   ├── pom.xml

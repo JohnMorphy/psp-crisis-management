@@ -85,11 +85,16 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 ## Stack technologiczny — decyzje ostateczne
 
 ### Frontend (`frontend/`)
-- **React 18 + Vite**
+- **npm workspaces** — monorepo root w `frontend/package.json`; pakiety: `shared/`, `app/`, `widget/`
+- **`@psp/shared`** — wspólny kod React/TS (komponenty, hooki, store, typy); zero zależności od Vite/Mendix
+- **`frontend/app/`** — standalone Vite app (dev + demo bez Mendix); czyta `VITE_API_BASE_URL`
+- **`frontend/widget/`** — Mendix pluggable widget; thin shell → `<GisMapApp apiBaseUrl={springBaseUrl} />`
+- **React 19 + Vite** (w `app/`)
+- **pluggable-widgets-tools 11** (w `widget/`) — rollup-based build; custom `rollup.config.js` stripuje TS/JSX z `@psp/shared` przed parserem acorn
 - **React-Leaflet** — jedyna biblioteka map. Nie używaj MapLibre GL JS.
 - **Zustand** — state management
 - **TanStack Query (React Query)** — data fetching, cache
-- **Tailwind CSS** — stylowanie
+- **Tailwind CSS** — stylowanie (v4; `@source "../../shared/src"` w `app/src/index.css`)
 - **Recharts** — wykresy w panelach
 - **SockJS + @stomp/stompjs** — WebSocket client (live feed)
 - **Web Speech API** — asystent głosowy (+ fallback Whisper API)
@@ -137,6 +142,7 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 | `ThreatAlertImportAgent` | Polling IMGW API + manual trigger → zapis do `threat_alert` → `ThreatAlertEvent` | `@Scheduled` co N minut + HTTP `POST /api/threats/manual` |
 | `NearbyUnitsAgent` | PostGIS ST_DWithin: jednostki w zasięgu alertu → `NearbyUnitsComputedEvent` | `@EventListener ThreatAlertEvent` |
 | `LiveFeedService` | Push alertów i pobliskich jednostek przez WebSocket | `@EventListener ThreatAlertEvent` + `@EventListener NearbyUnitsComputedEvent` |
+| `MendixImportAgent` | Polling Mendix REST API → upsert geom+category do `mendix_unit_cache` | `@Scheduled` co N minut (🔴 ZABLOKOWANE — wymaga docs Mendix API) |
 
 ### Dane
 - ✅ Pliki seed (`seed_*.sql`) służą wyłącznie do inicjalizacji bazy. Nie są odczytywane
@@ -221,6 +227,7 @@ w `docs/BACKLOG.md`, a następnie dokumenty do których ono odsyła.
 | DT-LOGS-TESTS | ⬜ | Logi + testy dla istniejących serwisów |
 | v1.1 — Zasoby + Alerty | ⬜ | resource_type, entity_resources, threat_alert, ThreatAlertImportAgent (IMGW), NearbyUnitsAgent, WebSocket |
 | v1.2 — Importy API | ⬜ | PSP, PRM, RPWDL bulk import + Nominatim geokodowanie + clustering |
+| CONCEPT CHANGE — Mendix Widget | ✅ | npm workspaces monorepo + @psp/shared + GisMap widget + mendix_unit_cache schema + JPA entity/repo |
 
 > ⬜ Nie rozpoczęta → 🔄 W toku → ✅ Ukończona
 
@@ -234,7 +241,8 @@ cp .env.example .env   # uzupełnij POSTGRES_PASSWORD
 # Tryb dev (zalecany — debugowanie)
 docker compose up -d postgres
 # backend: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-# frontend: npm run dev
+# frontend (standalone): cd frontend/app && npm run dev  → http://localhost:5173
+# frontend (widget dev): cd frontend/widget && npm run dev  → http://localhost:3000 (wymaga Studio Pro)
 
 # Tryb full-stack (demo / onboarding)
 docker compose -f docker-compose.full.yml up --build
@@ -261,8 +269,11 @@ Szczegóły: `docs/DEPLOYMENT.md`.
 | Schematy SQL + seed | `docs/DATA_SCHEMA.md` |
 | Konfiguracja warstw | tabela `layer_config` — seed: `db/03_seed_layers.sql` |
 | Rejestr podmiotów | `backend/.../model/EntityRegistryEntry.java` + tabela `entity_registry` |
-| Warstwa placówek (frontend) | `frontend/src/components/map/layers/EntityLayer.tsx` |
-| Popup placówki (frontend) | `frontend/src/components/map/EntityPopup.tsx` |
+| Warstwa placówek (frontend) | `frontend/shared/src/components/map/layers/EntityLayer.tsx` |
+| Popup placówki (frontend) | `frontend/shared/src/components/map/EntityPopup.tsx` |
+| Root komponent (widget + standalone) | `frontend/shared/src/GisMapApp.tsx` |
+| Mendix widget thin shell | `frontend/widget/src/GisMap.tsx` |
+| Mendix geo-cache entity | `backend/.../model/MendixUnitCache.java` + tabela `mendix_unit_cache` |
 
 ---
 

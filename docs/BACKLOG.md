@@ -4,7 +4,7 @@
 > Czytaj przed każdą sesją implementacyjną.
 > Format statusów: ⬜ Nie rozpoczęta → 🔄 W toku → ✅ Ukończona
 
-**Aktywne:** `REVISION 1 — UX fixes`
+**Aktywne:** `v1.1 — Zasoby + Alerty`
 
 ---
 
@@ -68,6 +68,30 @@ Weryfikacja: `npm run build` → 0 błędów TypeScript ✅
 Zaktualizowano: CLAUDE.md, PRD.md, ARCHITEKTURA_PLAN.md, DATA_SCHEMA.md, API_REFERENCE.md.
 Usunięto: IKE_ALGORITHM.md.
 Weryfikacja: brak słowa "IKE" jako aktywna funkcja w dokumentacji.
+
+---
+
+## ✅ CONCEPT CHANGE — Mendix Widget Migration
+
+**Data:** 2026-04-27  
+**Deliverable:** npm workspaces monorepo (`frontend/shared/`, `frontend/app/`, `frontend/widget/`) + `@psp/shared` pakiet + GisMap Mendix pluggable widget thin shell + `mendix_unit_cache` SQL schema + JPA entity/repo
+
+### Ukończone zadania
+- ✅ Task 1–11: Frontend restructuring — workspace root, @psp/shared, migracja komponentów/hooków/store, standalone Vite app, widget build verified
+- ✅ Task 12: SQL schema `mendix_unit_cache` + zmienne env (`.env.example`)
+- ✅ Task 13: JPA Entity `MendixUnitCache` + `MendixUnitCacheRepository` + testy jednostkowe
+
+### Zablokowane (wymagają dokumentacji Mendix REST API)
+- 🔴 Task 14: `MendixImportAgent` — polling Mendix REST → upsert `mendix_unit_cache`
+- 🔴 Task 15: `MendixUnitsController` — proxy `GET /api/mendix-units` do Mendix REST
+
+**Blokada:** Implementacja Task 14 i 15 wymaga od zespołu Mendix:
+1. Lista endpointów REST (URL, metoda HTTP)
+2. Schemat odpowiedzi JSON (pola, typy)
+3. Mechanizm autentykacji (format tokenu, nagłówek HTTP)
+
+Spec: `docs/superpowers/specs/2026-04-27-mendix-widget-architecture-design.md`  
+Plan: `docs/superpowers/plans/2026-04-27-mendix-widget-migration.md`
 
 ---
 
@@ -558,6 +582,56 @@ Szpitale, SPZOZ, hospicja. Parsowanie XLSX przez Apache POI.
 - kliknięcie klastra → fitBounds do bbox
 
 **Commit:** `feat(3.4): clustering jednostek — supercluster, zoom-based grouping`
+
+---
+
+## ⬜ MENDIX INTEGRATION — po odblokowaniu dokumentacji API
+
+> 🔴 ZABLOKOWANE: Wymaga dokumentacji Mendix REST API (endpointy, schemat, auth)
+
+### ⬜ M.1 — MendixImportAgent
+
+**Pliki:**
+- Create: `backend/src/main/java/pl/lublin/dashboard/agent/MendixImportAgent.java`
+- Create: `backend/src/test/java/pl/lublin/dashboard/agent/MendixImportAgentTest.java`
+
+**Odpowiedzialność:** `@Scheduled` co N minut → GET Mendix REST API → upsert `mendix_unit_cache` (tylko mendix_id, geom, category_code).
+
+**Wzorzec:**
+```java
+@Service @Slf4j
+public class MendixImportAgent {
+    @Value("${mendix.api.base-url}") private String mendixBaseUrl;
+    @Value("${mendix.api.token}")    private String mendixToken;
+
+    @Scheduled(fixedDelayString = "${mendix.import.interval-ms:300000}")
+    public void importUnits() {
+        log.info("[MendixImportAgent] import started");
+        // GET {mendixBaseUrl}/rest/... — endpoint TBD (wymaga docs)
+        // map → MendixUnitCache (tylko mendix_id, geom, category_code)
+        // repository.saveAll(...)
+        log.info("[MendixImportAgent] import completed — upserted={}", count);
+    }
+}
+```
+
+**Weryfikacja:** `./mvnw test -Dtest="MendixImportAgentTest" -q` → BUILD SUCCESS
+
+**Commit:** `feat(M.1): MendixImportAgent @Scheduled + testy`
+
+---
+
+### ⬜ M.2 — MendixUnitsController
+
+**Pliki:**
+- Create: `backend/src/main/java/pl/lublin/dashboard/controller/MendixUnitsController.java`
+- Create: `backend/src/test/java/pl/lublin/dashboard/controller/MendixUnitsControllerTest.java`
+
+**Odpowiedzialność:** `GET /api/mendix-units` — proxy szczegółów jednostek z Mendix REST API (nazwa, adres, telefon). Geometria z `mendix_unit_cache` (lokalna), szczegóły z Mendix (remote).
+
+**Weryfikacja:** `curl -s http://localhost:8080/api/mendix-units | jq '. | length'` → > 0
+
+**Commit:** `feat(M.2): MendixUnitsController GET /api/mendix-units + testy`
 
 ---
 
